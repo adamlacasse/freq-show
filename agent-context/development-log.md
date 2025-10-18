@@ -1,3 +1,4 @@
+````markdown
 # 🎶 FreqShow Project Notes
 
 ## 1. Project Overview
@@ -210,3 +211,14 @@ A playful, respectful, developer-built revival of the encyclopedic music culture
 - License: TBD (probably MIT or AGPL)  
 - Current state: concept, architectural design, name chosen, MVP planning complete
 - ChatGPT context preserved: design philosophy, technical direction, persona tone
+
+## 11. Development Log
+
+- **2025-10-12:** Backend skeleton scaffolding landed (`cmd/server`, `pkg/api`, `pkg/data`, `pkg/db`, `pkg/sources`). Minimal router exposes `/healthz`. Runtime configuration now resolved via environment variables (`APP_ENV`, `PORT`, `SHUTDOWN_TIMEOUT_SECONDS`) with defaults suitable for local runs and Fly.io deployment. `.env.example` added to document expected values.
+- **2025-10-12:** MusicBrainz client implemented with configurable base URL, timeout, and user agent metadata. API router now exposes `GET /artists/{mbid}` proxying to MusicBrainz, returning JSON responses with basic error handling.
+- **2025-10-18:** Introduced in-memory artist repository (`pkg/db`) and expanded domain models for richer metadata. HTTP router now composes dependencies via `RouterConfig`, serves `GET /artists/{mbid}` from cache when available, and persists fresh MusicBrainz responses to the store for reuse.
+- **2025-10-18:** Added unit tests covering the in-memory repository cloning behavior and the `/artists/{mbid}` handler flow (cache hit, cache miss, error branches) to safeguard upcoming persistence refactors.
+- **2025-10-18:** Introduced SQLite-backed persistence (configurable via `DATABASE_DRIVER`/`DATABASE_URL`) with JSON payload storage and migrations. Server now selects between in-memory and SQLite repositories at startup; new tests cover SQLite CRUD behavior.
+- **2025-10-18:** Expanded domain to albums: MusicBrainz client now fetches release groups, HTTP router exposes `GET /albums/{mbid}` with caching, and both in-memory and SQLite stores persist album payloads alongside artists. Added unit tests across API and persistence layers plus gofmt/go test verification.
+
+````
