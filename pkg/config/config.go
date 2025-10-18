@@ -17,7 +17,7 @@ const (
 	defaultMusicBrainzBase           = "https://musicbrainz.org/ws/2"
 	defaultMusicBrainzApp            = "freq-show"
 	defaultMusicBrainzVer            = "dev"
-	defaultMusicBrainzContact        = "dev@localhost"
+	defaultMusicBrainzContact        = "adamlacasse@outlook.com"
 	defaultMusicBrainzTimeoutSeconds = 6
 
 	shutdownTimeoutEnv       = "SHUTDOWN_TIMEOUT_SECONDS"
