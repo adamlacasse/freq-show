@@ -1,0 +1,41 @@
+<div class="relative min-h-screen bg-freq-ink">
+  <div class="pointer-events-none absolute inset-0 opacity-50" aria-hidden="true">
+    <div class="h-full w-full bg-freq-noise"></div>
+  </div>
+
+  <div class="relative flex min-h-screen flex-col">
+    <header class="border-b border-white/10 bg-freq-midnight/60 backdrop-blur">
+      <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
+        <a routerLink="/" class="text-lg font-semibold tracking-tight text-freq-cream transition hover:text-white">
+          {{ title }}
+        </a>
+        <nav class="flex flex-wrap items-center gap-3 text-sm font-medium">
+          <ng-container *ngFor="let link of navLinks">
+            <a *ngIf="link.path; else planned" [routerLink]="link.path" class="rounded-full border border-white/10 px-3 py-1 text-freq-cream transition hover:border-white/30 hover:bg-white/10">
+              {{ link.label }}
+            </a>
+            <ng-template #planned>
+              <span class="rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-wide text-freq-cream/60">
+                {{ link.label }}
+                <span class="ml-2 rounded-full bg-freq-rose/20 px-2 py-0.5 text-[10px] font-semibold text-freq-rose/90">
+                  {{ link.note }}
+                </span>
+              </span>
+            </ng-template>
+          </ng-container>
+        </nav>
+      </div>
+    </header>
+
+    <main class="flex-1">
+      <router-outlet />
+    </main>
+
+    <footer class="border-t border-white/5 bg-freq-midnight/60 backdrop-blur">
+      <div class="mx-auto flex w-full max-w-6xl flex-col gap-2 px-6 py-8 text-xs text-freq-cream/60 md:flex-row md:items-center md:justify-between">
+        <span>FreqShow — for those who still read liner notes.</span>
+        <span>Data via MusicBrainz today, Discogs tomorrow.</span>
+      </div>
+    </footer>
+  </div>
+</div>

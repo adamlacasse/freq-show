@@ -8,9 +8,8 @@ Reference material for the somewhat lazy music nerd.
 - Go 1.22 backend (`apps/server`) that proxies to the [MusicBrainz](https://musicbrainz.org/doc/Development/XML_Web_Service/Version_2) API and caches artist/album metadata.
 - Pluggable persistence layer with in-memory and SQLite implementations.
 - Minimal HTTP API: `/healthz`, `/artists/{mbid}`, `/albums/{mbid}`.
+- Angular 17 + Tailwind frontend (`apps/frontend`) providing the initial FreqShow shell and project roadmap page.
 - Development log in `agent-context/development-log.md` capturing ongoing decisions.
-
-Frontend work is not started yet; the focus so far is on the service layer.
 
 ## Architecture at a Glance
 - **`apps/server/cmd/server`** – Entry point; wires config, datastore, MusicBrainz client, HTTP router, and graceful shutdown.

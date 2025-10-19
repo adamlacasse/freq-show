@@ -220,5 +220,6 @@ A playful, respectful, developer-built revival of the encyclopedic music culture
 - **2025-10-18:** Added unit tests covering the in-memory repository cloning behavior and the `/artists/{mbid}` handler flow (cache hit, cache miss, error branches) to safeguard upcoming persistence refactors.
 - **2025-10-18:** Introduced SQLite-backed persistence (configurable via `DATABASE_DRIVER`/`DATABASE_URL`) with JSON payload storage and migrations. Server now selects between in-memory and SQLite repositories at startup; new tests cover SQLite CRUD behavior.
 - **2025-10-18:** Expanded domain to albums: MusicBrainz client now fetches release groups, HTTP router exposes `GET /albums/{mbid}` with caching, and both in-memory and SQLite stores persist album payloads alongside artists. Added unit tests across API and persistence layers plus gofmt/go test verification.
+- **2025-10-18:** Bootstrapped Angular 17 + Tailwind frontend (`apps/frontend`) with SSR scaffold, branded application shell, and roadmap-focused landing page. Tailwind theme tokens added for FreqShow palette; npm build verified.
 
 ````
