@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/adamlacasse/freq-show/pkg/data"
-	"github.com/adamlacasse/freq-show/pkg/db"
-	"github.com/adamlacasse/freq-show/pkg/sources/musicbrainz"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/data"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/db"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/musicbrainz"
 )
 
 // MusicBrainzClient captures the MusicBrainz operations the router relies on.

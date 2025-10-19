@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adamlacasse/freq-show/pkg/data"
-	"github.com/adamlacasse/freq-show/pkg/sources/musicbrainz"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/data"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/musicbrainz"
 )
 
 const (

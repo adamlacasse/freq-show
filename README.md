@@ -4,7 +4,8 @@
 Reference material for the somewhat lazy music nerd.
 
 ## What This Repo Contains
-- Go 1.22 backend that proxies to the [MusicBrainz](https://musicbrainz.org/doc/Development/XML_Web_Service/Version_2) API and caches artist/album metadata.
+- Monorepo layout with application code under `apps/` and room for shared libraries in `packages/`.
+- Go 1.22 backend (`apps/server`) that proxies to the [MusicBrainz](https://musicbrainz.org/doc/Development/XML_Web_Service/Version_2) API and caches artist/album metadata.
 - Pluggable persistence layer with in-memory and SQLite implementations.
 - Minimal HTTP API: `/healthz`, `/artists/{mbid}`, `/albums/{mbid}`.
 - Development log in `agent-context/development-log.md` capturing ongoing decisions.
@@ -12,12 +13,12 @@ Reference material for the somewhat lazy music nerd.
 Frontend work is not started yet; the focus so far is on the service layer.
 
 ## Architecture at a Glance
-- **`cmd/server`** – Entry point; wires config, datastore, MusicBrainz client, HTTP router, and graceful shutdown.
-- **`pkg/api`** – HTTP handlers using dependency-injected repositories and MusicBrainz client; handles caching logic.
-- **`pkg/config`** – Environment-driven configuration (port, shutdown timeout, database driver/URL, MusicBrainz headers/timeouts).
-- **`pkg/data`** – Domain structs shared across layers (artists, albums, tracks, reviews).
-- **`pkg/db`** – Repository interfaces plus memory/SQLite store implementations.
-- **`pkg/sources/musicbrainz`** – Thin client wrapping MusicBrainz REST endpoints with proper headers and response transforms.
+- **`apps/server/cmd/server`** – Entry point; wires config, datastore, MusicBrainz client, HTTP router, and graceful shutdown.
+- **`apps/server/pkg/api`** – HTTP handlers using dependency-injected repositories and MusicBrainz client; handles caching logic.
+- **`apps/server/pkg/config`** – Environment-driven configuration (port, shutdown timeout, database driver/URL, MusicBrainz headers/timeouts).
+- **`apps/server/pkg/data`** – Domain structs shared across layers (artists, albums, tracks, reviews).
+- **`apps/server/pkg/db`** – Repository interfaces plus memory/SQLite store implementations.
+- **`apps/server/pkg/sources/musicbrainz`** – Thin client wrapping MusicBrainz REST endpoints with proper headers and response transforms.
 
 See `agent-context/development-log.md` for a chronological narrative of how these pieces evolved.
 
@@ -29,7 +30,7 @@ See `agent-context/development-log.md` for a chronological narrative of how thes
 2. **Clone and Install Dependencies**
 	```bash
 	git clone https://github.com/adamlacasse/freq-show.git
-	cd freq-show
+	cd freq-show/apps/server
 	go mod download
 	```
 
@@ -44,7 +45,7 @@ See `agent-context/development-log.md` for a chronological narrative of how thes
 
 	MusicBrainz requires a contact email and descriptive user agent—update the defaults if you deploy publicly.
 
-4. **Run the Server**
+4. **Run the Server** (from `apps/server`)
 	```bash
 	go run ./cmd/server
 	```
@@ -58,7 +59,7 @@ See `agent-context/development-log.md` for a chronological narrative of how thes
 	curl http://localhost:8080/albums/1b022e01-4da6-387b-8658-8678046e4cef   # Nevermind
 	```
 
-6. **Run Tests**
+6. **Run Tests** (from `apps/server`)
 	```bash
 	go test ./...
 	```

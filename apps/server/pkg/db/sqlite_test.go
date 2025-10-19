@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/adamlacasse/freq-show/pkg/data"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/data"
 )
 
 const (

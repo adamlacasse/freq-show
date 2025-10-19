@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adamlacasse/freq-show/pkg/data"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/data"
 
 	_ "modernc.org/sqlite"
 )

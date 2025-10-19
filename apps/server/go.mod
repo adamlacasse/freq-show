@@ -1,4 +1,4 @@
-module github.com/adamlacasse/freq-show
+module github.com/adamlacasse/freq-show/apps/server
 
 go 1.22
 

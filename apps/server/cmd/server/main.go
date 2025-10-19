@@ -7,10 +7,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/adamlacasse/freq-show/pkg/api"
-	"github.com/adamlacasse/freq-show/pkg/config"
-	"github.com/adamlacasse/freq-show/pkg/db"
-	"github.com/adamlacasse/freq-show/pkg/sources/musicbrainz"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/api"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/config"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/db"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/musicbrainz"
 )
 
 func main() {

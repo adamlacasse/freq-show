@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/adamlacasse/freq-show/pkg/data"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/data"
 )
 
 // ArtistRepository defines persistence operations for artist entities.
