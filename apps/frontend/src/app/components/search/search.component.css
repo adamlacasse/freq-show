@@ -1,0 +1,25 @@
+/* Search Component Styles */
+.search-container {
+  width: 100%;
+  max-width: 42rem;
+  margin: 0 auto;
+}
+
+/* Custom scrollbar for results */
+.search-results::-webkit-scrollbar {
+  width: 6px;
+}
+
+.search-results::-webkit-scrollbar-track {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 9999px;
+}
+
+.search-results::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+}
+
+.search-results::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}

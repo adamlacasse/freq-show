@@ -1,39 +1,76 @@
-# Freq Show!
+# FreqShow
+
 ![Freq Show logo](docs/img/freq-show_logo.png)
 
-Reference material for the somewhat lazy music nerd.
+**Deep cuts, no ads.** A music encyclopedia for listeners who still read liner notes.
+
+> **Current Status**: MVP functional with working artist search, Go backend API, and Angular frontend. [Try it live](#quick-start) by searching for your favorite artists!
 
 ## What This Repo Contains
 - Monorepo layout with application code under `apps/` and room for shared libraries in `packages/`.
 - Go 1.22 backend (`apps/server`) that proxies to the [MusicBrainz](https://musicbrainz.org/doc/Development/XML_Web_Service/Version_2) API and caches artist/album metadata.
 - Pluggable persistence layer with in-memory and SQLite implementations.
-- Minimal HTTP API: `/healthz`, `/artists/{mbid}`, `/albums/{mbid}`.
-- Angular 17 + Tailwind frontend (`apps/frontend`) providing the initial FreqShow shell and project roadmap page.
+- HTTP API: `/healthz`, `/artists/{mbid}`, `/albums/{mbid}`, and `/search?q={query}` for artist search.
+- Angular 17 + Tailwind frontend (`apps/frontend`) with working search functionality and branded UI.
 - Development log in `agent-context/development-log.md` capturing ongoing decisions.
 
 ## Architecture at a Glance
+
+### Backend (Go)
 - **`apps/server/cmd/server`** – Entry point; wires config, datastore, MusicBrainz client, HTTP router, and graceful shutdown.
-- **`apps/server/pkg/api`** – HTTP handlers using dependency-injected repositories and MusicBrainz client; handles caching logic.
+- **`apps/server/pkg/api`** – HTTP handlers using dependency-injected repositories and MusicBrainz client; handles caching logic and CORS.
 - **`apps/server/pkg/config`** – Environment-driven configuration (port, shutdown timeout, database driver/URL, MusicBrainz headers/timeouts).
 - **`apps/server/pkg/data`** – Domain structs shared across layers (artists, albums, tracks, reviews).
 - **`apps/server/pkg/db`** – Repository interfaces plus memory/SQLite store implementations.
-- **`apps/server/pkg/sources/musicbrainz`** – Thin client wrapping MusicBrainz REST endpoints with proper headers and response transforms.
+- **`apps/server/pkg/sources/musicbrainz`** – Client wrapping MusicBrainz REST endpoints (lookup + search) with proper headers and response transforms.
+
+### Frontend (Angular + Tailwind)
+- **`apps/frontend/src/app/models`** – TypeScript interfaces matching backend API responses.
+- **`apps/frontend/src/app/services`** – Angular services for HTTP communication with the Go backend.
+- **`apps/frontend/src/app/components`** – Reusable UI components including the search component.
+- **`apps/frontend/src/app/pages`** – Route-level components like the homepage with integrated search.
 
 See `agent-context/development-log.md` for a chronological narrative of how these pieces evolved.
 
-## Getting Started
+## Quick Start
+
+To run both the backend API and frontend simultaneously:
+
 1. **Prerequisites**
 	- Go 1.22+
-	- (Optional) SQLite if you want to inspect the generated database file.
+	- Node.js 18+ and npm
+	- (Optional) SQLite if you want to inspect the generated database file
 
-2. **Clone and Install Dependencies**
+2. **Clone and Install**
 	```bash
 	git clone https://github.com/adamlacasse/freq-show.git
-	cd freq-show/apps/server
-	go mod download
+	cd freq-show
 	```
 
-3. **Configure Environment (optional)**
+3. **Start Backend** (Terminal 1)
+	```bash
+	cd apps/server
+	go mod download
+	go run ./cmd/server
+	# Backend runs on http://localhost:8080
+	```
+
+4. **Start Frontend** (Terminal 2)
+	```bash
+	cd apps/frontend
+	npm install
+	npm start
+	# Frontend runs on http://localhost:4200
+	```
+
+5. **Try It Out**
+	- Visit http://localhost:4200
+	- Use the search box to find artists like "Beatles" or "Nirvana"
+	- Results are fetched from MusicBrainz in real-time
+
+## Backend Configuration
+
+For backend-only development, you can configure environment variables (optional):
 	Create a `.env` file or export variables. Defaults are sensible for local development:
 	- `APP_ENV` (default `development`)
 	- `PORT` or `HTTP_PORT` (default `8080`)
@@ -44,33 +81,59 @@ See `agent-context/development-log.md` for a chronological narrative of how thes
 
 	MusicBrainz requires a contact email and descriptive user agent—update the defaults if you deploy publicly.
 
-4. **Run the Server** (from `apps/server`)
-	```bash
-	go run ./cmd/server
-	```
+## API Testing
 
-	The service listens on `http://localhost:8080` by default.
-
-5. **Hit the Endpoints**
+You can test the backend endpoints directly:
 	```bash
 	curl http://localhost:8080/healthz
 	curl http://localhost:8080/artists/5b11f4ce-a62d-471e-81fc-a69a8278c7da   # Nirvana
 	curl http://localhost:8080/albums/1b022e01-4da6-387b-8658-8678046e4cef   # Nevermind
+	curl "http://localhost:8080/search?q=beatles&limit=5"                     # Search artists
 	```
 
-6. **Run Tests** (from `apps/server`)
-	```bash
-	go test ./...
-	```
+## Development
+
+**Run Tests** (from `apps/server`)
+```bash
+go test ./...
+```
+
+**Frontend Development Server**
+```bash
+cd apps/frontend
+npm start
+# Runs with hot reload on http://localhost:4200
+```
 
 ## Development Notes
-- The first request for an artist/album fetches from MusicBrainz; subsequent requests return the cached payload.
-- The SQLite store persists JSON blobs—use `jq` or SQLite queries to inspect contents.
-- `agent-context/development-log.md` doubles as an AI assistant context file; it records milestones and outstanding ideas.
+- **Caching Strategy**: First request fetches from MusicBrainz; subsequent requests return cached payload from SQLite.
+- **Database**: SQLite stores JSON blobs—use `jq` or SQL queries to inspect: `sqlite3 apps/server/freqshow.db ".tables"`
+- **CORS**: Enabled for `http://localhost:4200` in development mode.
+- **Search Performance**: MusicBrainz search API is rate-limited; results are not currently cached (future enhancement).
+- **Documentation**: `agent-context/development-log.md` contains detailed development history and architectural decisions.
 
-## Roadmap Snapshot
-- Flesh out album details (tracks, labels) and artist enrichment beyond MusicBrainz defaults.
-- Add search endpoints and begin the Angular front end.
-- Expand documentation as new subsystems appear.
+## Current Features
+
+- **🔍 Artist Search** - Real-time search with MusicBrainz integration
+- **🎨 Branded UI** - Dark theme with FreqShow design language
+- **⚡ Fast Backend** - Go API with SQLite caching and CORS support
+- **🔄 Reactive Frontend** - Angular 17 with RxJS and Tailwind CSS
+- **📱 Responsive Design** - Works on desktop and mobile devices
+
+## What's Next
+
+**Immediate Priorities:**
+- **Artist Detail Pages** - Click search results to view full artist bios and discographies  
+- **Album Search** - Extend search to include release groups/albums
+- **Result Pagination** - Handle large search result sets efficiently
+
+**Future Enhancements:**
+- Search result caching and pagination
+- Album detail pages with track listings and credits
+- Review integration from open sources
+- Artist relationship mapping and "similar artists"
+- Genre exploration and filtering
+
+See `agent-context/development-log.md` for detailed technical roadmap.
 
 Questions or suggestions? Open an issue or drop a note.🎶

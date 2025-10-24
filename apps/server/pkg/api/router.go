@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/adamlacasse/freq-show/apps/server/pkg/data"
@@ -16,6 +17,7 @@ import (
 type MusicBrainzClient interface {
 	LookupArtist(ctx context.Context, id string) (*musicbrainz.Artist, error)
 	LookupReleaseGroup(ctx context.Context, id string) (*musicbrainz.ReleaseGroup, error)
+	SearchArtists(ctx context.Context, query string, limit int, offset int) (*musicbrainz.SearchResult, error)
 }
 
 // RouterConfig captures dependencies required by the HTTP router.
@@ -31,7 +33,8 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	mux.HandleFunc("/healthz", healthHandler)
 	mux.Handle("/artists/", artistLookupHandler(cfg.Artists, cfg.MusicBrainz))
 	mux.Handle("/albums/", albumLookupHandler(cfg.Albums, cfg.MusicBrainz))
-	return mux
+	mux.HandleFunc("/search", searchHandler(cfg.MusicBrainz))
+	return corsMiddleware(mux)
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -264,4 +267,68 @@ func transformAlbum(src *musicbrainz.ReleaseGroup) *data.Album {
 		CoverURL:         "",
 	}
 	return album
+}
+
+func searchHandler(client MusicBrainzClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !assertMethod(w, r, http.MethodGet) {
+			return
+		}
+
+		query := r.URL.Query().Get("q")
+		if strings.TrimSpace(query) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "search query parameter 'q' is required"})
+			return
+		}
+
+		limit := parseSearchLimit(r.URL.Query().Get("limit"))
+		offset := parseSearchOffset(r.URL.Query().Get("offset"))
+
+		result, err := client.SearchArtists(r.Context(), query, limit, offset)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "search failed"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, result)
+	}
+}
+
+func parseSearchLimit(limitStr string) int {
+	if limitStr == "" {
+		return 25
+	}
+	if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 && parsed <= 100 {
+		return parsed
+	}
+	return 25
+}
+
+func parseSearchOffset(offsetStr string) int {
+	if offsetStr == "" {
+		return 0
+	}
+	if parsed, err := strconv.Atoi(offsetStr); err == nil && parsed >= 0 {
+		return parsed
+	}
+	return 0
+}
+
+// corsMiddleware adds CORS headers for local development
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Allow requests from Angular dev server
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4200")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Max-Age", "86400")
+
+		// Handle preflight requests
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

@@ -23,8 +23,10 @@ const (
 	missingAlbum   = "/albums/missing"
 	baseAlbumPath  = "/albums/"
 	status200Fmt   = "expected status 200, got %d"
+	status400Fmt   = "expected status 400, got %d"
 	decodeErrFmt   = "failed to decode response: %v"
 	remoteArtist   = "Remote Artist"
+	unexpectedCall = "unexpected call"
 )
 
 type stubArtistRepo struct {
@@ -49,20 +51,28 @@ func (s *stubArtistRepo) SaveArtist(ctx context.Context, artist *data.Artist) er
 type stubMusicBrainz struct {
 	lookupArtistFunc       func(ctx context.Context, id string) (*musicbrainz.Artist, error)
 	lookupReleaseGroupFunc func(ctx context.Context, id string) (*musicbrainz.ReleaseGroup, error)
+	searchArtistsFunc      func(ctx context.Context, query string, limit int, offset int) (*musicbrainz.SearchResult, error)
 }
 
 func (s *stubMusicBrainz) LookupArtist(ctx context.Context, id string) (*musicbrainz.Artist, error) {
 	if s.lookupArtistFunc != nil {
 		return s.lookupArtistFunc(ctx, id)
 	}
-	return nil, errors.New("unexpected call")
+	return nil, errors.New(unexpectedCall)
 }
 
 func (s *stubMusicBrainz) LookupReleaseGroup(ctx context.Context, id string) (*musicbrainz.ReleaseGroup, error) {
 	if s.lookupReleaseGroupFunc != nil {
 		return s.lookupReleaseGroupFunc(ctx, id)
 	}
-	return nil, errors.New("unexpected call")
+	return nil, errors.New(unexpectedCall)
+}
+
+func (s *stubMusicBrainz) SearchArtists(ctx context.Context, query string, limit int, offset int) (*musicbrainz.SearchResult, error) {
+	if s.searchArtistsFunc != nil {
+		return s.searchArtistsFunc(ctx, query, limit, offset)
+	}
+	return nil, errors.New(unexpectedCall)
 }
 
 type stubAlbumRepo struct {
@@ -209,7 +219,7 @@ func TestArtistLookupHandlerBadRequest(t *testing.T) {
 	artistLookupHandler(repo, mb).ServeHTTP(res, req)
 
 	if res.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d", res.Code)
+		t.Fatalf(status400Fmt, res.Code)
 	}
 }
 
@@ -371,6 +381,65 @@ func TestAlbumLookupHandlerBadRequest(t *testing.T) {
 	albumLookupHandler(repo, mb).ServeHTTP(res, req)
 
 	if res.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d", res.Code)
+		t.Fatalf(status400Fmt, res.Code)
+	}
+}
+
+func TestSearchHandlerReturnsResults(t *testing.T) {
+	searchResult := &musicbrainz.SearchResult{
+		Artists: []musicbrainz.Artist{
+			{ID: "artist1", Name: "Test Artist 1"},
+			{ID: "artist2", Name: "Test Artist 2"},
+		},
+		Offset: 0,
+		Count:  2,
+	}
+
+	mb := &stubMusicBrainz{
+		searchArtistsFunc: func(ctx context.Context, query string, limit int, offset int) (*musicbrainz.SearchResult, error) {
+			if query != "test query" {
+				t.Fatalf("unexpected query %q", query)
+			}
+			if limit != 25 {
+				t.Fatalf("unexpected limit %d", limit)
+			}
+			if offset != 0 {
+				t.Fatalf("unexpected offset %d", offset)
+			}
+			return searchResult, nil
+		},
+	}
+
+	handler := searchHandler(mb)
+	req := httptest.NewRequest(http.MethodGet, "/search?q=test+query", nil)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf(status200Fmt, resp.Code)
+	}
+
+	var result musicbrainz.SearchResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf(decodeErrFmt, err)
+	}
+
+	if len(result.Artists) != 2 {
+		t.Fatalf("expected 2 artists, got %d", len(result.Artists))
+	}
+	if result.Artists[0].Name != "Test Artist 1" {
+		t.Fatalf("unexpected artist name %q", result.Artists[0].Name)
+	}
+}
+
+func TestSearchHandlerRequiresQuery(t *testing.T) {
+	mb := &stubMusicBrainz{}
+	handler := searchHandler(mb)
+	req := httptest.NewRequest(http.MethodGet, "/search", nil)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf(status400Fmt, resp.Code)
 	}
 }

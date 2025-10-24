@@ -16,6 +16,16 @@ import (
 // ErrNotFound indicates the requested resource was not present in MusicBrainz.
 var ErrNotFound = errors.New("musicbrainz: resource not found")
 
+const (
+	errRequestBuildFailed = "musicbrainz: request build failed: %w"
+	errRequestFailed      = "musicbrainz: request failed: %w"
+	errDecodeFailed       = "musicbrainz: decode failed: %w"
+	errUnexpectedStatus   = "musicbrainz: unexpected status %d: %s"
+	headerUserAgent       = "User-Agent"
+	headerAccept          = "Accept"
+	contentTypeJSON       = "application/json"
+)
+
 // Config describes how to connect to the MusicBrainz API.
 type Config struct {
 	BaseURL    string
@@ -148,14 +158,14 @@ func (c *Client) LookupArtist(ctx context.Context, id string) (*Artist, error) {
 	endpoint := fmt.Sprintf("%s/artist/%s?fmt=json", c.baseURL, url.PathEscape(trimmed))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return nil, fmt.Errorf("musicbrainz: request build failed: %w", err)
+		return nil, fmt.Errorf(errRequestBuildFailed, err)
 	}
-	req.Header.Set("User-Agent", c.userAgent)
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set(headerUserAgent, c.userAgent)
+	req.Header.Set(headerAccept, contentTypeJSON)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("musicbrainz: request failed: %w", err)
+		return nil, fmt.Errorf(errRequestFailed, err)
 	}
 	defer resp.Body.Close()
 
@@ -163,14 +173,14 @@ func (c *Client) LookupArtist(ctx context.Context, id string) (*Artist, error) {
 	case http.StatusOK:
 		var payload artistResponse
 		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			return nil, fmt.Errorf("musicbrainz: decode failed: %w", err)
+			return nil, fmt.Errorf(errDecodeFailed, err)
 		}
 		return transformArtist(payload), nil
 	case http.StatusNotFound:
 		return nil, ErrNotFound
 	default:
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, fmt.Errorf("musicbrainz: unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(snippet)))
+		return nil, fmt.Errorf(errUnexpectedStatus, resp.StatusCode, strings.TrimSpace(string(snippet)))
 	}
 }
 
@@ -203,14 +213,14 @@ func (c *Client) LookupReleaseGroup(ctx context.Context, id string) (*ReleaseGro
 	endpoint := fmt.Sprintf("%s/release-group/%s?fmt=json&inc=artists", c.baseURL, url.PathEscape(trimmed))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return nil, fmt.Errorf("musicbrainz: request build failed: %w", err)
+		return nil, fmt.Errorf(errRequestBuildFailed, err)
 	}
-	req.Header.Set("User-Agent", c.userAgent)
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set(headerUserAgent, c.userAgent)
+	req.Header.Set(headerAccept, contentTypeJSON)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("musicbrainz: request failed: %w", err)
+		return nil, fmt.Errorf(errRequestFailed, err)
 	}
 	defer resp.Body.Close()
 
@@ -218,14 +228,14 @@ func (c *Client) LookupReleaseGroup(ctx context.Context, id string) (*ReleaseGro
 	case http.StatusOK:
 		var payload releaseGroupResponse
 		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			return nil, fmt.Errorf("musicbrainz: decode failed: %w", err)
+			return nil, fmt.Errorf(errDecodeFailed, err)
 		}
 		return transformReleaseGroup(payload), nil
 	case http.StatusNotFound:
 		return nil, ErrNotFound
 	default:
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, fmt.Errorf("musicbrainz: unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(snippet)))
+		return nil, fmt.Errorf(errUnexpectedStatus, resp.StatusCode, strings.TrimSpace(string(snippet)))
 	}
 }
 
@@ -284,4 +294,106 @@ func (r *ReleaseGroup) ReleaseYear() int {
 		return 0
 	}
 	return year
+}
+
+// SearchResult represents a search result container from MusicBrainz.
+type SearchResult struct {
+	Artists []Artist `json:"artists"`
+	Offset  int      `json:"offset"`
+	Count   int      `json:"count"`
+}
+
+type searchResponse struct {
+	Artists []struct {
+		ID             string `json:"id"`
+		Name           string `json:"name"`
+		Country        string `json:"country"`
+		Type           string `json:"type"`
+		Disambiguation string `json:"disambiguation"`
+		Aliases        []struct {
+			Name string `json:"name"`
+		} `json:"aliases"`
+		LifeSpan LifeSpan `json:"life-span"`
+		Score    int      `json:"score"`
+	} `json:"artists"`
+	Offset int `json:"offset"`
+	Count  int `json:"count"`
+}
+
+// SearchArtists searches for artists by name or other criteria.
+func (c *Client) SearchArtists(ctx context.Context, query string, limit int, offset int) (*SearchResult, error) {
+	trimmed := strings.TrimSpace(query)
+	if trimmed == "" {
+		return nil, errors.New("musicbrainz: search query is required")
+	}
+
+	if limit <= 0 {
+		limit = 25
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	params := url.Values{}
+	params.Set("query", trimmed)
+	params.Set("fmt", "json")
+	params.Set("limit", strconv.Itoa(limit))
+	params.Set("offset", strconv.Itoa(offset))
+
+	endpoint := fmt.Sprintf("%s/artist/?%s", c.baseURL, params.Encode())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf(errRequestBuildFailed, err)
+	}
+	req.Header.Set(headerUserAgent, c.userAgent)
+	req.Header.Set(headerAccept, contentTypeJSON)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf(errRequestFailed, err)
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var payload searchResponse
+		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+			return nil, fmt.Errorf(errDecodeFailed, err)
+		}
+		return transformSearchResult(payload), nil
+	default:
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return nil, fmt.Errorf(errUnexpectedStatus, resp.StatusCode, strings.TrimSpace(string(snippet)))
+	}
+}
+
+func transformSearchResult(payload searchResponse) *SearchResult {
+	artists := make([]Artist, 0, len(payload.Artists))
+	for _, item := range payload.Artists {
+		aliases := make([]string, 0, len(item.Aliases))
+		for _, alias := range item.Aliases {
+			if alias.Name != "" {
+				aliases = append(aliases, alias.Name)
+			}
+		}
+
+		artists = append(artists, Artist{
+			ID:             item.ID,
+			Name:           item.Name,
+			Country:        item.Country,
+			Type:           item.Type,
+			Disambiguation: item.Disambiguation,
+			Aliases:        aliases,
+			LifeSpan:       item.LifeSpan,
+		})
+	}
+
+	return &SearchResult{
+		Artists: artists,
+		Offset:  payload.Offset,
+		Count:   payload.Count,
+	}
 }

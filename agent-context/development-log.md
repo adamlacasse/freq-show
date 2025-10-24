@@ -63,7 +63,15 @@ Go is a strong fit for:
 4. `freqshow/review` — stores critical reviews (parsed or summarized)
 5. `freqshow/db` — handles database connections, migrations, and caching
 
-### 🔌 Potential Data Sources & APIs
+### 🔌 Current API Endpoints
+| Endpoint | Method | Description | Example |
+|----------|--------|-------------|---------|
+| `/healthz` | GET | Health check | `curl localhost:8080/healthz` |
+| `/artists/{mbid}` | GET | Get artist by MusicBrainz ID | `curl localhost:8080/artists/5b11f4ce-a62d-471e-81fc-a69a8278c7da` |
+| `/albums/{mbid}` | GET | Get album by MusicBrainz ID | `curl localhost:8080/albums/1b022e01-4da6-387b-8658-8678046e4cef` |
+| `/search?q={query}&limit={n}&offset={n}` | GET | Search artists | `curl "localhost:8080/search?q=beatles&limit=5"` |
+
+### 🔌 Data Sources & APIs
 | Source | Use | Notes |
 |--------|-----|-------|
 | **MusicBrainz API** | Artist, album, release metadata | Free, structured, reliable |
@@ -90,17 +98,16 @@ The developer (you) is experienced in React but switching to **Angular** profess
 - **Routing** for different views (Artists, Albums, Genres, Reviews)
 - Optional: **NgRx** for state management once the app grows
 
-### 🧩 Core Components
-| Component | Description |
-|------------|-------------|
-| `ArtistList` | Displays artists by search or alphabetical index |
-| `ArtistDetail` | Bio, discography, related artists |
-| `AlbumDetail` | Tracklist, credits, reviews |
-| `ReviewCard` | Displays critic review excerpts |
-| `GenreExplorer` | Overview of genres and subgenres |
-| `SearchBar` | Global search and quick lookup |
-| `FreqShowHeader` / `Footer` | Branding and navigation |
-| `AboutPage` | Project info, mission statement |
+### 🧩 Core Components Status
+| Component | Status | Description |
+|------------|---------|-------------|
+| `SearchComponent` | ✅ **Built** | Debounced search with rich artist result cards |
+| `HomeComponent` | ✅ **Built** | Landing page with integrated search functionality |
+| `AppComponent` | ✅ **Built** | Application shell with branded header/footer |
+| `ArtistDetail` | 📋 *Planned* | Bio, discography, related artists |
+| `AlbumDetail` | 📋 *Planned* | Tracklist, credits, reviews |
+| `ReviewCard` | 📋 *Planned* | Displays critic review excerpts |
+| `GenreExplorer` | 📋 *Planned* | Overview of genres and subgenres |
 
 ### 🖋️ Visual Style
 - Minimalist but warm; evoke a record-store feel
@@ -148,24 +155,25 @@ type Review struct {
 
 ---
 
-## 6. Immediate Next Steps (MVP Roadmap)
+## 6. MVP Roadmap Status
 
-### Phase 1: Data & API foundation
-- [ ] Create Go project structure (`cmd/server`, `pkg/api`, `pkg/data`, etc.)
-- [ ] Integrate MusicBrainz API for basic artist and album data
-- [ ] Store fetched results locally (SQLite/Postgres)
-- [ ] Expose REST endpoints:
-  - `/artists/:id`
-  - `/albums/:id`
-  - `/search?q=`
-- [ ] Add logging, error handling, and rate limiting
+### Phase 1: Data & API foundation ✅ **COMPLETE**
+- [x] Create Go project structure (`cmd/server`, `pkg/api`, `pkg/data`, etc.)
+- [x] Integrate MusicBrainz API for basic artist and album data + search
+- [x] Store fetched results locally (SQLite/in-memory)
+- [x] Expose REST endpoints:
+  - [x] `/artists/:id`
+  - [x] `/albums/:id`
+  - [x] `/search?q=` with pagination support
+- [x] Add logging, error handling, rate limiting, and CORS
 
-### Phase 2: Angular client prototype
-- [ ] Bootstrap Angular app (`ng new freqshow`)
-- [ ] Create Artist and Album detail components
-- [ ] Connect to backend REST API
-- [ ] Implement search and display basic metadata
-- [ ] Use Tailwind for styling
+### Phase 2: Angular client prototype ✅ **COMPLETE**
+- [x] Bootstrap Angular app with SSR and Tailwind
+- [x] Create functional search component with rich UI
+- [x] Connect to backend REST API with reactive services
+- [x] Implement search and display artist metadata (country, type, life spans, aliases)
+- [x] Use Tailwind for styling with FreqShow brand theme
+- [ ] Create Artist and Album detail components (*next priority*)
 
 ### Phase 3: Enrichment & Reviews
 - [ ] Experiment with combining review data from open sources
@@ -209,7 +217,7 @@ A playful, respectful, developer-built revival of the encyclopedic music culture
 - Backend: Go  
 - Frontend: Angular + Tailwind  
 - License: TBD (probably MIT or AGPL)  
-- Current state: concept, architectural design, name chosen, MVP planning complete
+- Current state: MVP functional with working search, backend API complete, Angular frontend operational
 - ChatGPT context preserved: design philosophy, technical direction, persona tone
 
 ## 11. Development Log
@@ -221,5 +229,6 @@ A playful, respectful, developer-built revival of the encyclopedic music culture
 - **2025-10-18:** Introduced SQLite-backed persistence (configurable via `DATABASE_DRIVER`/`DATABASE_URL`) with JSON payload storage and migrations. Server now selects between in-memory and SQLite repositories at startup; new tests cover SQLite CRUD behavior.
 - **2025-10-18:** Expanded domain to albums: MusicBrainz client now fetches release groups, HTTP router exposes `GET /albums/{mbid}` with caching, and both in-memory and SQLite stores persist album payloads alongside artists. Added unit tests across API and persistence layers plus gofmt/go test verification.
 - **2025-10-18:** Bootstrapped Angular 17 + Tailwind frontend (`apps/frontend`) with SSR scaffold, branded application shell, and roadmap-focused landing page. Tailwind theme tokens added for FreqShow palette; npm build verified.
+- **2025-10-24:** Implemented full-stack search functionality: Added `SearchArtists` method to MusicBrainz client, created `GET /search?q={query}` endpoint with pagination support, and built Angular search service with reactive state management. Search component features debounced input, loading states, and rich artist result cards displaying metadata like country, type, disambiguation, and life spans. Added CORS middleware for local development. All endpoints tested and working with real MusicBrainz data. Frontend homepage now has functional artist search replacing placeholder button.
 
 ````
