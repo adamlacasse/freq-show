@@ -49,9 +49,10 @@ func (s *stubArtistRepo) SaveArtist(ctx context.Context, artist *data.Artist) er
 }
 
 type stubMusicBrainz struct {
-	lookupArtistFunc       func(ctx context.Context, id string) (*musicbrainz.Artist, error)
-	lookupReleaseGroupFunc func(ctx context.Context, id string) (*musicbrainz.ReleaseGroup, error)
-	searchArtistsFunc      func(ctx context.Context, query string, limit int, offset int) (*musicbrainz.SearchResult, error)
+	lookupArtistFunc           func(ctx context.Context, id string) (*musicbrainz.Artist, error)
+	lookupReleaseGroupFunc     func(ctx context.Context, id string) (*musicbrainz.ReleaseGroup, error)
+	searchArtistsFunc          func(ctx context.Context, query string, limit int, offset int) (*musicbrainz.SearchResult, error)
+	getArtistReleaseGroupsFunc func(ctx context.Context, artistID string, limit int, offset int) (*musicbrainz.ReleaseGroupSearchResult, error)
 }
 
 func (s *stubMusicBrainz) LookupArtist(ctx context.Context, id string) (*musicbrainz.Artist, error) {
@@ -71,6 +72,13 @@ func (s *stubMusicBrainz) LookupReleaseGroup(ctx context.Context, id string) (*m
 func (s *stubMusicBrainz) SearchArtists(ctx context.Context, query string, limit int, offset int) (*musicbrainz.SearchResult, error) {
 	if s.searchArtistsFunc != nil {
 		return s.searchArtistsFunc(ctx, query, limit, offset)
+	}
+	return nil, errors.New(unexpectedCall)
+}
+
+func (s *stubMusicBrainz) GetArtistReleaseGroups(ctx context.Context, artistID string, limit int, offset int) (*musicbrainz.ReleaseGroupSearchResult, error) {
+	if s.getArtistReleaseGroupsFunc != nil {
+		return s.getArtistReleaseGroupsFunc(ctx, artistID, limit, offset)
 	}
 	return nil, errors.New(unexpectedCall)
 }
