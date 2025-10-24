@@ -1,6 +1,7 @@
 import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { Subject, takeUntil, debounceTime, distinctUntilChanged } from 'rxjs';
 import { SearchService } from '../../services/search.service';
 import { SearchResult, Artist } from '../../models/search.models';
@@ -19,7 +20,10 @@ export class SearchComponent implements OnDestroy {
   private destroy$ = new Subject<void>();
   private searchSubject = new Subject<string>();
 
-  constructor(private searchService: SearchService) {
+  constructor(
+    private searchService: SearchService,
+    private router: Router
+  ) {
     // Subscribe to search results
     this.searchService.searchResults$
       .pipe(takeUntil(this.destroy$))
@@ -113,6 +117,10 @@ export class SearchComponent implements OnDestroy {
 
   trackByArtistId(index: number, artist: Artist): string {
     return artist.id;
+  }
+
+  onArtistClick(artist: Artist): void {
+    this.router.navigate(['/artists', artist.id]);
   }
 
   ngOnDestroy(): void {
