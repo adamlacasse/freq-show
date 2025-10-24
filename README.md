@@ -4,14 +4,14 @@
 
 **Deep cuts, no ads.** A music encyclopedia for listeners who still read liner notes.
 
-> **Current Status**: MVP functional with working artist search, Go backend API, and Angular frontend. [Try it live](#quick-start) by searching for your favorite artists!
+> **Current Status**: Full-featured music browser with artist search, detailed artist pages, complete album information with track listings, and comprehensive navigation. [Try it live](#quick-start) by searching for artists like "Nirvana" or "Beatles" and exploring their complete discographies!
 
 ## What This Repo Contains
 - Monorepo layout with application code under `apps/` and room for shared libraries in `packages/`.
 - Go 1.22 backend (`apps/server`) that proxies to the [MusicBrainz](https://musicbrainz.org/doc/Development/XML_Web_Service/Version_2) API and caches artist/album metadata.
 - Pluggable persistence layer with in-memory and SQLite implementations.
-- HTTP API: `/healthz`, `/artists/{mbid}`, `/albums/{mbid}`, and `/search?q={query}` for artist search.
-- Angular 17 + Tailwind frontend (`apps/frontend`) with working search functionality and branded UI.
+- HTTP API: `/healthz`, `/artists/{mbid}`, `/albums/{mbid}`, and `/search?q={query}` with complete artist/album data and track listings.
+- Angular 17 + Tailwind frontend (`apps/frontend`) with search, artist detail pages, album detail pages, and full navigation flow.
 - Development log in `agent-context/development-log.md` capturing ongoing decisions.
 
 ## Architecture at a Glance
@@ -51,7 +51,7 @@ To run both the backend API and frontend simultaneously:
 	```bash
 	cd apps/server
 	go mod download
-	go run ./cmd/server
+	go run ./cmd/server/main.go
 	# Backend runs on http://localhost:8080
 	```
 
@@ -65,8 +65,10 @@ To run both the backend API and frontend simultaneously:
 
 5. **Try It Out**
 	- Visit http://localhost:4200
-	- Use the search box to find artists like "Beatles" or "Nirvana"
-	- Results are fetched from MusicBrainz in real-time
+	- Search for artists like "Beatles" or "Nirvana"
+	- Click on any artist to view their detailed biography and complete discography
+	- Click on any album to see full track listings with durations
+	- Navigate seamlessly: search → artist → album → tracks
 
 ## Backend Configuration
 
@@ -86,9 +88,22 @@ For backend-only development, you can configure environment variables (optional)
 You can test the backend endpoints directly:
 	```bash
 	curl http://localhost:8080/healthz
-	curl http://localhost:8080/artists/5b11f4ce-a62d-471e-81fc-a69a8278c7da   # Nirvana
-	curl http://localhost:8080/albums/1b022e01-4da6-387b-8658-8678046e4cef   # Nevermind
-	curl "http://localhost:8080/search?q=beatles&limit=5"                     # Search artists
+	curl http://localhost:8080/artists/5b11f4ce-a62d-471e-81fc-a69a8278c7da   # Nirvana with full discography
+	curl http://localhost:8080/albums/1b022e01-4da6-387b-8658-8678046e4cef   # Nevermind with all 12 tracks
+	curl "http://localhost:8080/search?q=beatles&limit=5"                     # Search artists with rich metadata
+	```
+	
+	**Sample Response** (album with tracks):
+	```json
+	{
+		"id": "1b022e01-4da6-387b-8658-8678046e4cef",
+		"title": "Nevermind",
+		"tracks": [
+			{"number": 1, "title": "Smells Like Teen Spirit", "length": "5:01"},
+			{"number": 2, "title": "In Bloom", "length": "4:15"},
+			...
+		]
+	}
 	```
 
 ## Development
@@ -114,25 +129,33 @@ npm start
 
 ## Current Features
 
-- **🔍 Artist Search** - Real-time search with MusicBrainz integration
-- **🎨 Branded UI** - Dark theme with FreqShow design language
-- **⚡ Fast Backend** - Go API with SQLite caching and CORS support
-- **🔄 Reactive Frontend** - Angular 17 with RxJS and Tailwind CSS
-- **📱 Responsive Design** - Works on desktop and mobile devices
+- **🔍 Artist Search** - Real-time search with MusicBrainz integration and rich result cards
+- **👤 Artist Detail Pages** - Complete artist information with biography, discography, and metadata
+- **💽 Album Detail Pages** - Full album information with track listings, durations, and release details
+- **🎵 Track Listings** - Complete tracklists with track numbers, titles, and precise durations
+- **🧭 Seamless Navigation** - Intuitive flow from search to artist to album to tracks
+- **🎨 Branded UI** - Dark theme with FreqShow design language and professional typography  
+- **⚡ Fast Backend** - Go API with intelligent MusicBrainz caching and SQLite persistence
+- **🔄 Reactive Frontend** - Angular 17 with RxJS state management and Tailwind CSS
+- **📱 Responsive Design** - Optimized experience on desktop and mobile devices
 
 ## What's Next
 
-**Immediate Priorities:**
-- **Artist Detail Pages** - Click search results to view full artist bios and discographies  
-- **Album Search** - Extend search to include release groups/albums
-- **Result Pagination** - Handle large search result sets efficiently
+**Enhanced Search & Discovery:**
+- **Album Search** - Extend search to include release groups/albums alongside artists
+- **Search Result Caching** - Cache popular search queries for improved performance
+- **Result Pagination** - Handle large search result sets with proper pagination
 
-**Future Enhancements:**
-- Search result caching and pagination
-- Album detail pages with track listings and credits
-- Review integration from open sources
-- Artist relationship mapping and "similar artists"
-- Genre exploration and filtering
+**Content Enrichment:**
+- **Review Integration** - Add curated review excerpts from open sources
+- **Artist Relationships** - Show "similar artists" and musical connections  
+- **Genre Exploration** - Add genre filtering and discovery features
+- **Album Artwork** - Integrate cover art from MusicBrainz Cover Art Archive
+
+**Advanced Features:**
+- **Advanced Search** - Filter by genre, year, country, album type
+- **Personal Collections** - Save favorite artists and albums
+- **Discovery Mode** - Algorithmic recommendations and themed browsing
 
 See `agent-context/development-log.md` for detailed technical roadmap.
 

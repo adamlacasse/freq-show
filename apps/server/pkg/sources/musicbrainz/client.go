@@ -121,6 +121,28 @@ type LifeSpan struct {
 	Ended bool   `json:"ended,omitempty"`
 }
 
+// Release represents a specific release of an album with track information.
+type Release struct {
+	ID     string  `json:"id"`
+	Title  string  `json:"title"`
+	Status string  `json:"status"`
+	Date   string  `json:"date"`
+	Tracks []Track `json:"tracks"`
+}
+
+// Track represents a single track/recording within a release.
+type Track struct {
+	Number    int    `json:"number"`
+	Title     string `json:"title"`
+	Length    string `json:"length"`
+	ID        string `json:"id"`
+	Recording struct {
+		ID     string `json:"id"`
+		Title  string `json:"title"`
+		Length int    `json:"length"`
+	} `json:"recording"`
+}
+
 type artistResponse struct {
 	ID             string `json:"id"`
 	Name           string `json:"name"`
@@ -139,13 +161,41 @@ type releaseGroupResponse struct {
 	PrimaryType      string   `json:"primary-type"`
 	SecondaryTypes   []string `json:"secondary-types"`
 	FirstReleaseDate string   `json:"first-release-date"`
-	ArtistCredit     []struct {
+	Releases         []struct {
+		ID     string `json:"id"`
+		Title  string `json:"title"`
+		Status string `json:"status"`
+		Date   string `json:"date"`
+	} `json:"releases"`
+	ArtistCredit []struct {
 		Name   string `json:"name"`
 		Artist struct {
 			ID   string `json:"id"`
 			Name string `json:"name"`
 		} `json:"artist"`
 	} `json:"artist-credit"`
+}
+
+type releaseResponse struct {
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	Status string `json:"status"`
+	Date   string `json:"date"`
+	Media  []struct {
+		Position int `json:"position"`
+		Tracks   []struct {
+			Position  int    `json:"position"`
+			Number    string `json:"number"`
+			Title     string `json:"title"`
+			Length    int    `json:"length"`
+			ID        string `json:"id"`
+			Recording struct {
+				ID     string `json:"id"`
+				Title  string `json:"title"`
+				Length int    `json:"length"`
+			} `json:"recording"`
+		} `json:"tracks"`
+	} `json:"media"`
 }
 
 // LookupArtist retrieves a single artist record by MusicBrainz ID.
@@ -210,7 +260,7 @@ func (c *Client) LookupReleaseGroup(ctx context.Context, id string) (*ReleaseGro
 		return nil, errors.New("musicbrainz: release group id is required")
 	}
 
-	endpoint := fmt.Sprintf("%s/release-group/%s?fmt=json&inc=artists", c.baseURL, url.PathEscape(trimmed))
+	endpoint := fmt.Sprintf("%s/release-group/%s?fmt=json&inc=artists+releases", c.baseURL, url.PathEscape(trimmed))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf(errRequestBuildFailed, err)
@@ -239,6 +289,115 @@ func (c *Client) LookupReleaseGroup(ctx context.Context, id string) (*ReleaseGro
 	}
 }
 
+// GetReleaseGroupTracks retrieves track listings for a release group by finding a representative release.
+func (c *Client) GetReleaseGroupTracks(ctx context.Context, releaseGroupID string) ([]Track, error) {
+	trimmed := strings.TrimSpace(releaseGroupID)
+	if trimmed == "" {
+		return nil, errors.New("musicbrainz: release group id is required")
+	}
+
+	// Find a good representative release (prefer official releases)
+	releaseID, err := c.findRepresentativeRelease(ctx, trimmed)
+	if err != nil {
+		return nil, fmt.Errorf("musicbrainz: failed to find representative release: %w", err)
+	}
+
+	// Get the release with recordings
+	return c.getReleaseRecordings(ctx, releaseID)
+}
+
+// findRepresentativeRelease finds the best release to use for track listings.
+func (c *Client) findRepresentativeRelease(ctx context.Context, releaseGroupID string) (string, error) {
+	payload, err := c.fetchReleaseGroupWithReleases(ctx, releaseGroupID)
+	if err != nil {
+		return "", err
+	}
+
+	return c.selectBestRelease(payload.Releases), nil
+}
+
+func (c *Client) fetchReleaseGroupWithReleases(ctx context.Context, releaseGroupID string) (*releaseGroupResponse, error) {
+	endpoint := fmt.Sprintf("%s/release-group/%s?fmt=json&inc=releases", c.baseURL, url.PathEscape(releaseGroupID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf(errRequestBuildFailed, err)
+	}
+	req.Header.Set(headerUserAgent, c.userAgent)
+	req.Header.Set(headerAccept, contentTypeJSON)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf(errRequestFailed, err)
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var payload releaseGroupResponse
+		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+			return nil, fmt.Errorf(errDecodeFailed, err)
+		}
+		return &payload, nil
+	case http.StatusNotFound:
+		return nil, ErrNotFound
+	default:
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return nil, fmt.Errorf(errUnexpectedStatus, resp.StatusCode, strings.TrimSpace(string(snippet)))
+	}
+}
+
+func (c *Client) selectBestRelease(releases []struct {
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	Status string `json:"status"`
+	Date   string `json:"date"`
+}) string {
+	// Find the best release (prefer official releases)
+	for _, release := range releases {
+		if release.Status == "Official" {
+			return release.ID
+		}
+	}
+
+	// If no official release found, use the first release
+	if len(releases) > 0 {
+		return releases[0].ID
+	}
+
+	return ""
+}
+
+// getReleaseRecordings gets the track/recording data for a specific release.
+func (c *Client) getReleaseRecordings(ctx context.Context, releaseID string) ([]Track, error) {
+	endpoint := fmt.Sprintf("%s/release/%s?fmt=json&inc=recordings", c.baseURL, url.PathEscape(releaseID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf(errRequestBuildFailed, err)
+	}
+	req.Header.Set(headerUserAgent, c.userAgent)
+	req.Header.Set(headerAccept, contentTypeJSON)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf(errRequestFailed, err)
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var payload releaseResponse
+		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+			return nil, fmt.Errorf(errDecodeFailed, err)
+		}
+		return transformReleaseTracks(payload), nil
+	case http.StatusNotFound:
+		return nil, ErrNotFound
+	default:
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return nil, fmt.Errorf(errUnexpectedStatus, resp.StatusCode, strings.TrimSpace(string(snippet)))
+	}
+}
+
 func transformReleaseGroup(payload releaseGroupResponse) *ReleaseGroup {
 	credits := make([]ArtistCredit, 0, len(payload.ArtistCredit))
 	for _, credit := range payload.ArtistCredit {
@@ -259,6 +418,48 @@ func transformReleaseGroup(payload releaseGroupResponse) *ReleaseGroup {
 		FirstReleaseDate: payload.FirstReleaseDate,
 		ArtistCredit:     credits,
 	}
+}
+
+func transformReleaseTracks(payload releaseResponse) []Track {
+	var allTracks []Track
+	for _, medium := range payload.Media {
+		for _, track := range medium.Tracks {
+			// Convert track length from milliseconds to MM:SS format
+			length := ""
+			if track.Length > 0 {
+				seconds := track.Length / 1000
+				minutes := seconds / 60
+				remainingSeconds := seconds % 60
+				length = fmt.Sprintf("%d:%02d", minutes, remainingSeconds)
+			}
+
+			// Parse track number (handle string to int conversion)
+			trackNumber := track.Position
+			if trackNumber == 0 {
+				// Try to parse the number field if position is not available
+				if num, err := strconv.Atoi(track.Number); err == nil {
+					trackNumber = num
+				}
+			}
+
+			allTracks = append(allTracks, Track{
+				Number: trackNumber,
+				Title:  track.Title,
+				Length: length,
+				ID:     track.ID,
+				Recording: struct {
+					ID     string `json:"id"`
+					Title  string `json:"title"`
+					Length int    `json:"length"`
+				}{
+					ID:     track.Recording.ID,
+					Title:  track.Recording.Title,
+					Length: track.Recording.Length,
+				},
+			})
+		}
+	}
+	return allTracks
 }
 
 // PrimaryArtistID returns the ID of the first credited artist, if present.

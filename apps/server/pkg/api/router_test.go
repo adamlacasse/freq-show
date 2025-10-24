@@ -53,6 +53,7 @@ type stubMusicBrainz struct {
 	lookupReleaseGroupFunc     func(ctx context.Context, id string) (*musicbrainz.ReleaseGroup, error)
 	searchArtistsFunc          func(ctx context.Context, query string, limit int, offset int) (*musicbrainz.SearchResult, error)
 	getArtistReleaseGroupsFunc func(ctx context.Context, artistID string, limit int, offset int) (*musicbrainz.ReleaseGroupSearchResult, error)
+	getReleaseGroupTracksFunc  func(ctx context.Context, releaseGroupID string) ([]musicbrainz.Track, error)
 }
 
 func (s *stubMusicBrainz) LookupArtist(ctx context.Context, id string) (*musicbrainz.Artist, error) {
@@ -81,6 +82,13 @@ func (s *stubMusicBrainz) GetArtistReleaseGroups(ctx context.Context, artistID s
 		return s.getArtistReleaseGroupsFunc(ctx, artistID, limit, offset)
 	}
 	return nil, errors.New(unexpectedCall)
+}
+
+func (s *stubMusicBrainz) GetReleaseGroupTracks(ctx context.Context, releaseGroupID string) ([]musicbrainz.Track, error) {
+	if s.getReleaseGroupTracksFunc != nil {
+		return s.getReleaseGroupTracksFunc(ctx, releaseGroupID)
+	}
+	return nil, nil // Return empty tracks by default for tests
 }
 
 type stubAlbumRepo struct {

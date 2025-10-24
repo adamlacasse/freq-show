@@ -19,6 +19,7 @@ type MusicBrainzClient interface {
 	LookupReleaseGroup(ctx context.Context, id string) (*musicbrainz.ReleaseGroup, error)
 	SearchArtists(ctx context.Context, query string, limit int, offset int) (*musicbrainz.SearchResult, error)
 	GetArtistReleaseGroups(ctx context.Context, artistID string, limit int, offset int) (*musicbrainz.ReleaseGroupSearchResult, error)
+	GetReleaseGroupTracks(ctx context.Context, releaseGroupID string) ([]musicbrainz.Track, error)
 }
 
 // RouterConfig captures dependencies required by the HTTP router.
@@ -236,6 +237,14 @@ func getOrFetchAlbum(ctx context.Context, repo db.AlbumRepository, client MusicB
 	}
 
 	domainAlbum := transformAlbum(remote)
+
+	// Fetch track listings
+	tracks, err := client.GetReleaseGroupTracks(ctx, id)
+	if err == nil {
+		domainAlbum.Tracks = transformTracks(tracks)
+	}
+	// If track fetching fails, we continue without tracks rather than failing the whole request
+
 	if repo != nil {
 		if err := repo.SaveAlbum(ctx, domainAlbum); err != nil {
 			return nil, newAPIError(http.StatusInternalServerError, "album cache failed")
@@ -290,6 +299,23 @@ func transformAlbum(src *musicbrainz.ReleaseGroup) *data.Album {
 		CoverURL:         "",
 	}
 	return album
+}
+
+func transformTracks(mbTracks []musicbrainz.Track) []data.Track {
+	if len(mbTracks) == 0 {
+		return nil
+	}
+
+	tracks := make([]data.Track, 0, len(mbTracks))
+	for _, mbTrack := range mbTracks {
+		track := data.Track{
+			Number: mbTrack.Number,
+			Title:  mbTrack.Title,
+			Length: mbTrack.Length,
+		}
+		tracks = append(tracks, track)
+	}
+	return tracks
 }
 
 func transformReleaseGroupsToAlbums(releaseGroups []musicbrainz.ReleaseGroup) []data.Album {
