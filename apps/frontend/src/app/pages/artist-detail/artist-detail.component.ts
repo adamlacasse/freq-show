@@ -95,4 +95,8 @@ export class ArtistDetailComponent implements OnInit, OnDestroy {
   trackByRelatedId(index: number, relatedId: string): string {
     return relatedId;
   }
+
+  onAlbumClick(album: any): void {
+    this.router.navigate(['/albums', album.id]);
+  }
 }

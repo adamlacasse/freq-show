@@ -18,6 +18,7 @@ type MusicBrainzClient interface {
 	LookupArtist(ctx context.Context, id string) (*musicbrainz.Artist, error)
 	LookupReleaseGroup(ctx context.Context, id string) (*musicbrainz.ReleaseGroup, error)
 	SearchArtists(ctx context.Context, query string, limit int, offset int) (*musicbrainz.SearchResult, error)
+	GetArtistReleaseGroups(ctx context.Context, artistID string, limit int, offset int) (*musicbrainz.ReleaseGroupSearchResult, error)
 }
 
 // RouterConfig captures dependencies required by the HTTP router.
@@ -159,6 +160,17 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, client Musi
 			return nil, newAPIError(http.StatusInternalServerError, "artist lookup failed")
 		}
 		if artist != nil {
+			// If cached artist has no albums, fetch them
+			if artist.Albums == nil || len(artist.Albums) == 0 {
+				if client != nil {
+					releaseGroups, err := client.GetArtistReleaseGroups(ctx, id, 50, 0)
+					if err == nil {
+						artist.Albums = transformReleaseGroupsToAlbums(releaseGroups.ReleaseGroups)
+						// Update the cached artist with albums
+						_ = repo.SaveArtist(ctx, artist)
+					}
+				}
+			}
 			return artist, nil
 		}
 	}
@@ -178,6 +190,17 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, client Musi
 	}
 
 	domainArtist := transformArtist(remote)
+
+	// Fetch artist's albums/release groups
+	releaseGroups, err := client.GetArtistReleaseGroups(ctx, id, 50, 0)
+	if err != nil {
+		// Don't fail the artist lookup if albums can't be fetched
+		// Just log and continue with empty albums
+		domainArtist.Albums = nil
+	} else {
+		domainArtist.Albums = transformReleaseGroupsToAlbums(releaseGroups.ReleaseGroups)
+	}
+
 	if repo != nil {
 		if err := repo.SaveArtist(ctx, domainArtist); err != nil {
 			return nil, newAPIError(http.StatusInternalServerError, "artist cache failed")
@@ -267,6 +290,33 @@ func transformAlbum(src *musicbrainz.ReleaseGroup) *data.Album {
 		CoverURL:         "",
 	}
 	return album
+}
+
+func transformReleaseGroupsToAlbums(releaseGroups []musicbrainz.ReleaseGroup) []data.Album {
+	if len(releaseGroups) == 0 {
+		return nil
+	}
+
+	albums := make([]data.Album, 0, len(releaseGroups))
+	for _, rg := range releaseGroups {
+		album := data.Album{
+			ID:               rg.ID,
+			Title:            rg.Title,
+			ArtistID:         rg.PrimaryArtistID(),
+			ArtistName:       rg.PrimaryArtistName(),
+			PrimaryType:      rg.PrimaryType,
+			SecondaryTypes:   append([]string(nil), rg.SecondaryTypes...),
+			FirstReleaseDate: rg.FirstReleaseDate,
+			Year:             rg.ReleaseYear(),
+			Genre:            "",
+			Label:            "",
+			Tracks:           nil,
+			Review:           data.Review{},
+			CoverURL:         "",
+		}
+		albums = append(albums, album)
+	}
+	return albums
 }
 
 func searchHandler(client MusicBrainzClient) http.HandlerFunc {

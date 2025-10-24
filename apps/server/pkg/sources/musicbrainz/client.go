@@ -397,3 +397,103 @@ func transformSearchResult(payload searchResponse) *SearchResult {
 		Count:   payload.Count,
 	}
 }
+
+// ReleaseGroupSearchResult represents the response from a release group search for an artist.
+type ReleaseGroupSearchResult struct {
+	ReleaseGroups []ReleaseGroup `json:"release-groups"`
+	Count         int            `json:"release-group-count"`
+	Offset        int            `json:"release-group-offset"`
+}
+
+type releaseGroupSearchResponse struct {
+	ReleaseGroups []struct {
+		ID               string   `json:"id"`
+		Title            string   `json:"title"`
+		PrimaryType      string   `json:"primary-type"`
+		SecondaryTypes   []string `json:"secondary-types"`
+		FirstReleaseDate string   `json:"first-release-date"`
+	} `json:"release-groups"`
+	Count  int `json:"release-group-count"`
+	Offset int `json:"release-group-offset"`
+}
+
+// GetArtistReleaseGroups retrieves the release groups (albums) for a given artist.
+func (c *Client) GetArtistReleaseGroups(ctx context.Context, artistID string, limit int, offset int) (*ReleaseGroupSearchResult, error) {
+	trimmed := strings.TrimSpace(artistID)
+	if trimmed == "" {
+		return nil, errors.New("musicbrainz: artist id is required")
+	}
+
+	if limit <= 0 {
+		limit = 25
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	params := url.Values{}
+	params.Set("fmt", "json")
+	params.Set("limit", strconv.Itoa(limit))
+	params.Set("offset", strconv.Itoa(offset))
+	params.Set("type", "album|ep") // Focus on main releases
+
+	endpoint := fmt.Sprintf("%s/release-group?artist=%s&%s", c.baseURL, url.QueryEscape(trimmed), params.Encode())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf(errRequestBuildFailed, err)
+	}
+	req.Header.Set(headerUserAgent, c.userAgent)
+	req.Header.Set(headerAccept, contentTypeJSON)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf(errRequestFailed, err)
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var payload releaseGroupSearchResponse
+		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+			return nil, fmt.Errorf(errDecodeFailed, err)
+		}
+		return transformReleaseGroupSearchResult(payload, artistID), nil
+	default:
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return nil, fmt.Errorf(errUnexpectedStatus, resp.StatusCode, strings.TrimSpace(string(snippet)))
+	}
+}
+
+func transformReleaseGroupSearchResult(payload releaseGroupSearchResponse, artistID string) *ReleaseGroupSearchResult {
+	releaseGroups := make([]ReleaseGroup, 0, len(payload.ReleaseGroups))
+	for _, item := range payload.ReleaseGroups {
+		// Create a basic artist credit for the known artist
+		artistCredit := []ArtistCredit{
+			{
+				Name: "", // We don't have the artist name in this response
+				Artist: ReleaseGroupArtist{
+					ID:   artistID,
+					Name: "",
+				},
+			},
+		}
+
+		releaseGroups = append(releaseGroups, ReleaseGroup{
+			ID:               item.ID,
+			Title:            item.Title,
+			PrimaryType:      item.PrimaryType,
+			SecondaryTypes:   append([]string(nil), item.SecondaryTypes...),
+			FirstReleaseDate: item.FirstReleaseDate,
+			ArtistCredit:     artistCredit,
+		})
+	}
+
+	return &ReleaseGroupSearchResult{
+		ReleaseGroups: releaseGroups,
+		Count:         payload.Count,
+		Offset:        payload.Offset,
+	}
+}
