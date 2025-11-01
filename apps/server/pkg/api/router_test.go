@@ -91,6 +91,17 @@ func (s *stubMusicBrainz) GetReleaseGroupTracks(ctx context.Context, releaseGrou
 	return nil, nil // Return empty tracks by default for tests
 }
 
+type stubWikipedia struct {
+	getArtistBiographyFunc func(ctx context.Context, artistName string) (string, error)
+}
+
+func (s *stubWikipedia) GetArtistBiography(ctx context.Context, artistName string) (string, error) {
+	if s.getArtistBiographyFunc != nil {
+		return s.getArtistBiographyFunc(ctx, artistName)
+	}
+	return "", nil // Return empty biography by default for tests
+}
+
 type stubAlbumRepo struct {
 	getFunc  func(ctx context.Context, id string) (*data.Album, error)
 	saveFunc func(ctx context.Context, album *data.Album) error
@@ -133,10 +144,12 @@ func TestArtistLookupHandlerReturnsCachedArtist(t *testing.T) {
 		},
 	}
 
+	wiki := &stubWikipedia{} // Default behavior is fine for cached response
+
 	req := httptest.NewRequest(http.MethodGet, artistPath, nil)
 	res := httptest.NewRecorder()
 
-	artistLookupHandler(repo, mb).ServeHTTP(res, req)
+	artistLookupHandler(repo, mb, wiki).ServeHTTP(res, req)
 
 	if res.Code != http.StatusOK {
 		t.Fatalf(status200Fmt, res.Code)
@@ -175,10 +188,12 @@ func TestArtistLookupHandlerFetchesAndCaches(t *testing.T) {
 		},
 	}
 
+	wiki := &stubWikipedia{} // Default behavior is fine
+
 	req := httptest.NewRequest(http.MethodGet, artistPath, nil)
 	res := httptest.NewRecorder()
 
-	artistLookupHandler(repo, mb).ServeHTTP(res, req)
+	artistLookupHandler(repo, mb, wiki).ServeHTTP(res, req)
 
 	if res.Code != http.StatusOK {
 		t.Fatalf(status200Fmt, res.Code)
@@ -201,10 +216,12 @@ func TestArtistLookupHandlerHandlesNotFound(t *testing.T) {
 		},
 	}
 
+	wiki := &stubWikipedia{} // Default behavior is fine
+
 	req := httptest.NewRequest(http.MethodGet, missingPath, nil)
 	res := httptest.NewRecorder()
 
-	artistLookupHandler(repo, mb).ServeHTTP(res, req)
+	artistLookupHandler(repo, mb, wiki).ServeHTTP(res, req)
 
 	if res.Code != http.StatusNotFound {
 		t.Fatalf("expected status 404, got %d", res.Code)
@@ -214,11 +231,12 @@ func TestArtistLookupHandlerHandlesNotFound(t *testing.T) {
 func TestArtistLookupHandlerMethodNotAllowed(t *testing.T) {
 	repo := &stubArtistRepo{}
 	mb := &stubMusicBrainz{}
+	wiki := &stubWikipedia{}
 
 	req := httptest.NewRequest(http.MethodPost, artistPath, strings.NewReader(""))
 	res := httptest.NewRecorder()
 
-	artistLookupHandler(repo, mb).ServeHTTP(res, req)
+	artistLookupHandler(repo, mb, wiki).ServeHTTP(res, req)
 
 	if res.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected status 405, got %d", res.Code)
@@ -228,11 +246,12 @@ func TestArtistLookupHandlerMethodNotAllowed(t *testing.T) {
 func TestArtistLookupHandlerBadRequest(t *testing.T) {
 	repo := &stubArtistRepo{}
 	mb := &stubMusicBrainz{}
+	wiki := &stubWikipedia{}
 
 	req := httptest.NewRequest(http.MethodGet, baseArtistPath, nil)
 	res := httptest.NewRecorder()
 
-	artistLookupHandler(repo, mb).ServeHTTP(res, req)
+	artistLookupHandler(repo, mb, wiki).ServeHTTP(res, req)
 
 	if res.Code != http.StatusBadRequest {
 		t.Fatalf(status400Fmt, res.Code)
@@ -246,11 +265,12 @@ func TestArtistLookupHandlerRepositoryError(t *testing.T) {
 		},
 	}
 	mb := &stubMusicBrainz{}
+	wiki := &stubWikipedia{}
 
 	req := httptest.NewRequest(http.MethodGet, artistPath, nil)
 	res := httptest.NewRecorder()
 
-	artistLookupHandler(repo, mb).ServeHTTP(res, req)
+	artistLookupHandler(repo, mb, wiki).ServeHTTP(res, req)
 
 	if res.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", res.Code)
@@ -265,10 +285,12 @@ func TestArtistLookupHandlerMusicBrainzError(t *testing.T) {
 		},
 	}
 
+	wiki := &stubWikipedia{}
+
 	req := httptest.NewRequest(http.MethodGet, artistPath, nil)
 	res := httptest.NewRecorder()
 
-	artistLookupHandler(repo, mb).ServeHTTP(res, req)
+	artistLookupHandler(repo, mb, wiki).ServeHTTP(res, req)
 
 	if res.Code != http.StatusBadGateway {
 		t.Fatalf("expected status 502, got %d", res.Code)
