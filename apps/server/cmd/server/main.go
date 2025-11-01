@@ -11,6 +11,7 @@ import (
 	"github.com/adamlacasse/freq-show/apps/server/pkg/config"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/db"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/musicbrainz"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/wikipedia"
 )
 
 func main() {
@@ -50,8 +51,18 @@ func main() {
 		log.Fatalf("musicbrainz client init failed: %v", err)
 	}
 
+	wikiClient, err := wikipedia.New(baseCtx, wikipedia.Config{
+		BaseURL:   cfg.Wikipedia.BaseURL,
+		UserAgent: cfg.Wikipedia.UserAgent,
+		Timeout:   cfg.Wikipedia.Timeout,
+	})
+	if err != nil {
+		log.Fatalf("wikipedia client init failed: %v", err)
+	}
+
 	router := api.NewRouter(api.RouterConfig{
 		MusicBrainz: mbClient,
+		Wikipedia:   wikiClient,
 		Artists:     store,
 		Albums:      store,
 	})

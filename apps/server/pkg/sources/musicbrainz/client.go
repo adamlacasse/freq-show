@@ -89,6 +89,7 @@ type Artist struct {
 	Type           string   `json:"type,omitempty"`
 	Disambiguation string   `json:"disambiguation,omitempty"`
 	Aliases        []string `json:"aliases,omitempty"`
+	Tags           []string `json:"tags,omitempty"`
 	LifeSpan       LifeSpan `json:"lifeSpan"`
 }
 
@@ -152,6 +153,10 @@ type artistResponse struct {
 	Aliases        []struct {
 		Name string `json:"name"`
 	} `json:"aliases"`
+	Tags []struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	} `json:"tags"`
 	LifeSpan LifeSpan `json:"life-span"`
 }
 
@@ -205,7 +210,7 @@ func (c *Client) LookupArtist(ctx context.Context, id string) (*Artist, error) {
 		return nil, errors.New("musicbrainz: artist id is required")
 	}
 
-	endpoint := fmt.Sprintf("%s/artist/%s?fmt=json", c.baseURL, url.PathEscape(trimmed))
+	endpoint := fmt.Sprintf("%s/artist/%s?fmt=json&inc=tags", c.baseURL, url.PathEscape(trimmed))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf(errRequestBuildFailed, err)
@@ -242,6 +247,14 @@ func transformArtist(payload artistResponse) *Artist {
 		}
 	}
 
+	// Extract tags and convert them to genres, filtering out common non-genre tags
+	var tags []string
+	for _, tag := range payload.Tags {
+		if tag.Name != "" && isGenreTag(tag.Name) {
+			tags = append(tags, tag.Name)
+		}
+	}
+
 	return &Artist{
 		ID:             payload.ID,
 		Name:           payload.Name,
@@ -249,8 +262,72 @@ func transformArtist(payload artistResponse) *Artist {
 		Type:           payload.Type,
 		Disambiguation: payload.Disambiguation,
 		Aliases:        aliases,
+		Tags:           tags,
 		LifeSpan:       payload.LifeSpan,
 	}
+}
+
+// isGenreTag filters out non-genre tags like years, places, etc.
+func isGenreTag(tag string) bool {
+	// Filter out common non-genre tags
+	excludedTags := map[string]bool{
+		"american":          true,
+		"british":           true,
+		"english":           true,
+		"canadian":          true,
+		"german":            true,
+		"french":            true,
+		"japanese":          true,
+		"australian":        true,
+		"swedish":           true,
+		"norwegian":         true,
+		"danish":            true,
+		"dutch":             true,
+		"italian":           true,
+		"spanish":           true,
+		"male":              true,
+		"female":            true,
+		"vocalist":          true,
+		"singer":            true,
+		"composer":          true,
+		"songwriter":        true,
+		"producer":          true,
+		"guitarist":         true,
+		"bassist":           true,
+		"drummer":           true,
+		"pianist":           true,
+		"keyboardist":       true,
+		"violinist":         true,
+		"saxophonist":       true,
+		"trumpeter":         true,
+		"born in the 1950s": true,
+		"born in the 1960s": true,
+		"born in the 1970s": true,
+		"born in the 1980s": true,
+		"born in the 1990s": true,
+		"died in the 1990s": true,
+		"died in the 2000s": true,
+		"died in the 2010s": true,
+		"died in the 2020s": true,
+		"1990s":             true,
+		"2000s":             true,
+		"2010s":             true,
+		"2020s":             true,
+		"active":            true,
+		"inactive":          true,
+		"disbanded":         true,
+		"solo":              true,
+		"duo":               true,
+		"trio":              true,
+		"quartet":           true,
+		"band":              true,
+		"group":             true,
+		"orchestra":         true,
+		"ensemble":          true,
+	}
+
+	tagLower := strings.ToLower(tag)
+	return !excludedTags[tagLower]
 }
 
 // LookupReleaseGroup retrieves an album (release group) by ID.

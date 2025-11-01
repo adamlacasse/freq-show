@@ -72,16 +72,17 @@ Go is a strong fit for:
 | `/search?q={query}&limit={n}&offset={n}` | GET | Search artists | `curl "localhost:8080/search?q=beatles&limit=5"` |
 
 ### 🔌 Data Sources & APIs
-| Source | Use | Notes |
-|--------|-----|-------|
-| **MusicBrainz API** | Artist, album, release metadata | Free, structured, reliable |
-| **Discogs API** | Album details, credits, catalog numbers | Requires API key, generous limits |
-| **Last.fm API** | Tags, genres, basic descriptions | Good for supplemental genre data |
-| **Wikipedia / Wikidata** | Context and bios | Can use for fallback info |
-| **RateYourMusic (RYM)** | Ratings, reviews | No public API — scraping risk; avoid for now |
-| **AllMusic (informational)** | Review source | No API; possible future scraping or licensed use |
+| Source | Status | Use | Implementation Notes |
+|--------|--------|-----|----------------------|
+| **MusicBrainz API** | ✅ **Active** | Artist, album, release metadata, genres/tags | Comprehensive client in `pkg/sources/musicbrainz` with tag filtering |
+| **Wikipedia API** | ✅ **Active** | Artist biographies | Smart fallback client in `pkg/sources/wikipedia` with content cleaning |
+| **SQLite Database** | ✅ **Active** | Local caching and persistence | All API responses cached for performance |
+| **Discogs API** | 📋 *Planned* | Album details, credits, catalog numbers | Requires API key, generous limits |
+| **Last.fm API** | 📋 *Planned* | Artist images, additional tag data | Good for supplemental metadata |
+| **RateYourMusic (RYM)** | ❌ *Avoided* | Ratings, reviews | No public API — scraping risk |
+| **AllMusic** | 📋 *Research* | Review source | No API; possible future licensed use |
 
-> Goal: combine structured data (MusicBrainz/Discogs) with curated review text from reliable sources (public domain or licensed).
+> **Current approach**: Combine MusicBrainz structured data with Wikipedia biographical content, all cached locally for fast access.
 
 ---
 
@@ -104,8 +105,11 @@ The developer (you) is experienced in React but switching to **Angular** profess
 | `SearchComponent` | ✅ **Built** | Debounced search with rich artist result cards |
 | `HomeComponent` | ✅ **Built** | Landing page with integrated search functionality |
 | `AppComponent` | ✅ **Built** | Application shell with branded header/footer |
-| `ArtistDetail` | 📋 *Planned* | Bio, discography, related artists |
-| `AlbumDetail` | 📋 *Planned* | Tracklist, credits, reviews |
+| `ArtistDetailComponent` | ✅ **Built** | Rich artist pages with Wikipedia biographies, MusicBrainz genres/tags, chronologically sorted discographies, and comprehensive metadata display |
+| `AlbumDetailComponent` | ✅ **Built** | Complete album pages with detailed track listings, release information, and metadata |
+| `SearchService` | ✅ **Built** | Reactive search state management with debouncing |
+| `ArtistService` | ✅ **Built** | Artist data fetching and caching |
+| `AlbumService` | ✅ **Built** | Album data fetching and caching |
 | `ReviewCard` | 📋 *Planned* | Displays critic review excerpts |
 | `GenreExplorer` | 📋 *Planned* | Overview of genres and subgenres |
 
@@ -116,40 +120,52 @@ The developer (you) is experienced in React but switching to **Angular** profess
 
 ---
 
-## 5. Data Model Sketch
+## 5. Current Data Model
 
 ```go
-// Simplified Go data model examples
+// Current Go data model implementation in pkg/data/models.go
 
 type Artist struct {
-    ID          string
-    Name        string
-    Biography   string
-    Genres      []string
-    Albums      []Album
-    Related     []string // artist IDs
-    ImageURL    string
+    ID             string   `json:"id"`
+    Name           string   `json:"name"`
+    Biography      string   `json:"biography"`        // Wikipedia integration
+    Genres         []string `json:"genres"`           // MusicBrainz tags (filtered)
+    Albums         []Album  `json:"albums"`
+    Related        []string `json:"related"`
+    ImageURL       string   `json:"imageUrl"`
+    Country        string   `json:"country,omitempty"`
+    Type           string   `json:"type,omitempty"`
+    Disambiguation string   `json:"disambiguation,omitempty"`
+    Aliases        []string `json:"aliases,omitempty"`
+    LifeSpan       LifeSpan `json:"lifeSpan"`
 }
 
 type Album struct {
-    ID          string
-    Title       string
-    ArtistID    string
-    Year        int
-    Genre       string
-    Label       string
-    Tracks      []Track
-    Review      Review
-    CoverURL    string
+    ID               string   `json:"id"`
+    Title            string   `json:"title"`
+    ArtistID         string   `json:"artistId"`
+    ArtistName       string   `json:"artistName,omitempty"`
+    PrimaryType      string   `json:"primaryType,omitempty"`
+    SecondaryTypes   []string `json:"secondaryTypes,omitempty"`
+    FirstReleaseDate string   `json:"firstReleaseDate,omitempty"`
+    Year             int      `json:"year"`             // Chronological sorting
+    Genre            string   `json:"genre"`
+    Label            string   `json:"label"`
+    Tracks           []Track  `json:"tracks"`           // Full track listings
+    Review           Review   `json:"review"`
+    CoverURL         string   `json:"coverUrl"`
 }
 
-type Review struct {
-    Source      string
-    Author      string
-    Rating      float64
-    Summary     string
-    Text        string
-    URL         string
+type Track struct {
+    Number int    `json:"number"`
+    Title  string `json:"title"`
+    Length string `json:"length"`                       // MM:SS format
+}
+
+type LifeSpan struct {
+    Begin string `json:"begin,omitempty"`
+    End   string `json:"end,omitempty"`
+    Ended bool   `json:"ended,omitempty"`
 }
 ```
 
@@ -173,12 +189,20 @@ type Review struct {
 - [x] Connect to backend REST API with reactive services
 - [x] Implement search and display artist metadata (country, type, life spans, aliases)
 - [x] Use Tailwind for styling with FreqShow brand theme
-- [ ] Create Artist and Album detail components (*next priority*)
+- [x] Create comprehensive Artist detail components with full navigation
+- [x] Create complete Album detail components with tracklists
+- [x] Implement artist biography integration (Wikipedia API)
+- [x] Add genre/tag display (MusicBrainz tags)
+- [x] Implement chronological discography sorting
 
-### Phase 3: Enrichment & Reviews
-- [ ] Experiment with combining review data from open sources
-- [ ] Add support for displaying multiple critical voices (where available)
-- [ ] Implement caching and pagination
+### Phase 3: Content Enhancement ⚡ **IN PROGRESS**
+- [x] Wikipedia biography integration with smart fallback strategies
+- [x] MusicBrainz genre/tag classification and filtering
+- [x] Comprehensive track listing with duration formatting
+- [ ] Artist image integration (Last.fm, Discogs, or other sources)
+- [ ] Album artwork and cover art display
+- [ ] Related artists functionality using MusicBrainz relationships
+- [ ] Review integration from open sources
 
 ### Phase 4: UX & Personality
 - [ ] Branding: logo, color palette, typography
@@ -233,5 +257,7 @@ A playful, respectful, developer-built revival of the encyclopedic music culture
 - **2025-10-24:** Built artist detail pages with complete navigation flow: Created `ArtistDetailComponent` with comprehensive artist information display, added artist service for individual lookups, implemented routing for `/artists/:id`, and made search results clickable. Artist detail pages show rich metadata including biography placeholders, genre information, aliases, life spans, and discography sections with proper loading states and error handling. Added keyboard accessibility and proper semantic HTML. Full user journey now works: search → click result → view detailed artist page → navigate back to search.
 - **2025-10-24:** Implemented complete album browsing experience: Enhanced MusicBrainz client with `GetArtistReleaseGroups` method to fetch artist discographies, populated artist detail pages with real album data (up to 50 albums per artist), created full-featured `AlbumDetailComponent` with release information, tracklist placeholders, and review sections, added album service and routing for `/albums/:id`. Complete navigation flow now works: search → artist detail → album detail. Albums display year, type, and release metadata with professional loading states and error handling. Backend properly caches albums for both new artists and updates existing cached artists with discography data.
 - **2025-10-24:** Added comprehensive track listing functionality: Extended MusicBrainz client with `GetReleaseGroupTracks` method that finds representative releases and fetches detailed track data including titles, durations, and track numbers. Updated backend API to populate album track arrays with real data from MusicBrainz recordings API. Enhanced data transformation layer to convert millisecond durations to MM:SS format and handle track numbering. Album detail pages now display complete tracklists with professional formatting—12 tracks shown for Nirvana's "Nevermind" including "Smells Like Teen Spirit" (5:01), "In Bloom" (4:15), etc. All existing tests updated and passing. Track data properly cached in SQLite alongside album metadata.
+- **2025-10-31:** Implemented rich artist metadata enhancement: Added MusicBrainz tags integration with `inc=tags` parameter to fetch genre information, filtering out non-genre tags (nationalities, instruments, etc.) with smart classification. Created comprehensive Wikipedia API client (`pkg/sources/wikipedia`) with intelligent fallback search strategies (artist name, "band", "musician", "singer" variations), content cleaning (removing pronunciation guides, limiting to 3 sentences/500 chars), and proper error handling. Updated backend data transformation to populate genres from tags and biographies from Wikipedia. Enhanced artist detail page UI with professional genre display (color-coded primary/secondary genres, visual hierarchy), improved biography section with source attribution, and enhanced empty states. All data sources properly integrated with dependency injection and environment configuration.
+- **2025-10-31:** Added discography chronological sorting: Implemented `sortedAlbums` computed property in `ArtistDetailComponent` to sort albums by year in descending order (newest first) with alphabetical fallback for same-year releases. Enhanced discography UI with sorting indicator, prominent year badges on each album card, improved visual hierarchy emphasizing release years, and music-themed icons. Updated album card layout to better accommodate chronological browsing patterns. Users can now easily explore artist evolution from latest releases back to earliest work, matching standard music database navigation expectations.
 
 ````

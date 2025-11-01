@@ -22,9 +22,15 @@ type MusicBrainzClient interface {
 	GetReleaseGroupTracks(ctx context.Context, releaseGroupID string) ([]musicbrainz.Track, error)
 }
 
+// WikipediaClient captures the Wikipedia operations the router relies on.
+type WikipediaClient interface {
+	GetArtistBiography(ctx context.Context, artistName string) (string, error)
+}
+
 // RouterConfig captures dependencies required by the HTTP router.
 type RouterConfig struct {
 	MusicBrainz MusicBrainzClient
+	Wikipedia   WikipediaClient
 	Artists     db.ArtistRepository
 	Albums      db.AlbumRepository
 }
@@ -33,7 +39,7 @@ type RouterConfig struct {
 func NewRouter(cfg RouterConfig) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", healthHandler)
-	mux.Handle("/artists/", artistLookupHandler(cfg.Artists, cfg.MusicBrainz))
+	mux.Handle("/artists/", artistLookupHandler(cfg.Artists, cfg.MusicBrainz, cfg.Wikipedia))
 	mux.Handle("/albums/", albumLookupHandler(cfg.Albums, cfg.MusicBrainz))
 	mux.HandleFunc("/search", searchHandler(cfg.MusicBrainz))
 	return corsMiddleware(mux)
@@ -47,7 +53,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func artistLookupHandler(repo db.ArtistRepository, client MusicBrainzClient) http.Handler {
+func artistLookupHandler(repo db.ArtistRepository, mbClient MusicBrainzClient, wikiClient WikipediaClient) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !assertMethod(w, r, http.MethodGet) {
 			return
@@ -59,7 +65,7 @@ func artistLookupHandler(repo db.ArtistRepository, client MusicBrainzClient) htt
 			return
 		}
 
-		artist, err := getOrFetchArtist(r.Context(), repo, client, id)
+		artist, err := getOrFetchArtist(r.Context(), repo, mbClient, wikiClient, id)
 		if err != nil {
 			handleAPIError(w, err)
 			return
@@ -154,7 +160,7 @@ func handleAPIError(w http.ResponseWriter, err error) {
 	writeJSON(w, http.StatusInternalServerError, errorResponse{"request failed"})
 }
 
-func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, client MusicBrainzClient, id string) (*data.Artist, error) {
+func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, mbClient MusicBrainzClient, wikiClient WikipediaClient, id string) (*data.Artist, error) {
 	if repo != nil {
 		artist, err := repo.GetArtist(ctx, id)
 		if err != nil {
@@ -163,8 +169,8 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, client Musi
 		if artist != nil {
 			// If cached artist has no albums, fetch them
 			if artist.Albums == nil || len(artist.Albums) == 0 {
-				if client != nil {
-					releaseGroups, err := client.GetArtistReleaseGroups(ctx, id, 50, 0)
+				if mbClient != nil {
+					releaseGroups, err := mbClient.GetArtistReleaseGroups(ctx, id, 50, 0)
 					if err == nil {
 						artist.Albums = transformReleaseGroupsToAlbums(releaseGroups.ReleaseGroups)
 						// Update the cached artist with albums
@@ -176,11 +182,11 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, client Musi
 		}
 	}
 
-	if client == nil {
+	if mbClient == nil {
 		return nil, newAPIError(http.StatusServiceUnavailable, "musicbrainz client unavailable")
 	}
 
-	remote, err := client.LookupArtist(ctx, id)
+	remote, err := mbClient.LookupArtist(ctx, id)
 	if err != nil {
 		switch {
 		case errors.Is(err, musicbrainz.ErrNotFound):
@@ -192,8 +198,17 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, client Musi
 
 	domainArtist := transformArtist(remote)
 
+	// Fetch biography from Wikipedia
+	if wikiClient != nil {
+		biography, err := wikiClient.GetArtistBiography(ctx, remote.Name)
+		if err == nil {
+			domainArtist.Biography = biography
+		}
+		// Continue even if biography fetch fails
+	}
+
 	// Fetch artist's albums/release groups
-	releaseGroups, err := client.GetArtistReleaseGroups(ctx, id, 50, 0)
+	releaseGroups, err := mbClient.GetArtistReleaseGroups(ctx, id, 50, 0)
 	if err != nil {
 		// Don't fail the artist lookup if albums can't be fetched
 		// Just log and continue with empty albums
@@ -262,7 +277,7 @@ func transformArtist(src *musicbrainz.Artist) *data.Artist {
 		ID:             src.ID,
 		Name:           src.Name,
 		Biography:      "",
-		Genres:         nil,
+		Genres:         append([]string(nil), src.Tags...),
 		Albums:         nil,
 		Related:        nil,
 		ImageURL:       "",

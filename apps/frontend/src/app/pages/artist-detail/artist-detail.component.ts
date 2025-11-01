@@ -99,4 +99,25 @@ export class ArtistDetailComponent implements OnInit, OnDestroy {
   onAlbumClick(album: any): void {
     this.router.navigate(['/albums', album.id]);
   }
+
+  get sortedAlbums() {
+    if (!this.artist?.albums) {
+      return [];
+    }
+    
+    return [...this.artist.albums].sort((a, b) => {
+      // Sort by year (most recent first)
+      // Handle cases where year might be 0 or undefined
+      const yearA = a.year || 0;
+      const yearB = b.year || 0;
+      
+      if (yearA === yearB) {
+        // If years are the same, sort alphabetically by title
+        return a.title.localeCompare(b.title);
+      }
+      
+      // Sort by year descending (newest first)
+      return yearB - yearA;
+    });
+  }
 }

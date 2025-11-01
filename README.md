@@ -4,31 +4,33 @@
 
 **Deep cuts, no ads.** A music encyclopedia for listeners who still read liner notes.
 
-> **Current Status**: Full-featured music browser with artist search, detailed artist pages, complete album information with track listings, and comprehensive navigation. [Try it live](#quick-start) by searching for artists like "Nirvana" or "Beatles" and exploring their complete discographies!
+> **Current Status**: Fully functional music encyclopedia with artist search, rich artist biographies from Wikipedia, genre classification, chronologically sorted discographies, complete album pages with track listings, and seamless navigation. Features professional dark theme UI and intelligent data caching. [Try it live](#quick-start) by searching for artists like "Nirvana" or "Beatles" to explore their biographies, genres, and complete chronological discographies!
 
 ## What This Repo Contains
-- Monorepo layout with application code under `apps/` and room for shared libraries in `packages/`.
-- Go 1.22 backend (`apps/server`) that proxies to the [MusicBrainz](https://musicbrainz.org/doc/Development/XML_Web_Service/Version_2) API and caches artist/album metadata.
-- Pluggable persistence layer with in-memory and SQLite implementations.
-- HTTP API: `/healthz`, `/artists/{mbid}`, `/albums/{mbid}`, and `/search?q={query}` with complete artist/album data and track listings.
-- Angular 17 + Tailwind frontend (`apps/frontend`) with search, artist detail pages, album detail pages, and full navigation flow.
-- Development log in `agent-context/development-log.md` capturing ongoing decisions.
+- **Modern Monorepo**: Clean layout with application code under `apps/` and room for shared libraries in `packages/`.
+- **Go 1.22 Backend** (`apps/server`): High-performance API that integrates MusicBrainz metadata with Wikipedia biographies, intelligent genre classification, and comprehensive caching.
+- **Multi-Source Data Integration**: MusicBrainz API for structured music data + Wikipedia API for artist biographies with smart fallback strategies.
+- **Pluggable Architecture**: In-memory and SQLite persistence implementations with full dependency injection.
+- **Rich REST API**: `/healthz`, `/artists/{mbid}`, `/albums/{mbid}`, and `/search?q={query}` endpoints serving complete artist/album data with genres, biographies, and track listings.
+- **Angular 17 Frontend** (`apps/frontend`): Professional UI with search, artist detail pages with biographies and genres, album detail pages, chronological discography sorting, and seamless navigation.
+- **Comprehensive Documentation**: Development log in `agent-context/development-log.md` capturing architectural decisions and evolution.
 
 ## Architecture at a Glance
 
 ### Backend (Go)
-- **`apps/server/cmd/server`** – Entry point; wires config, datastore, MusicBrainz client, HTTP router, and graceful shutdown.
-- **`apps/server/pkg/api`** – HTTP handlers using dependency-injected repositories and MusicBrainz client; handles caching logic and CORS.
-- **`apps/server/pkg/config`** – Environment-driven configuration (port, shutdown timeout, database driver/URL, MusicBrainz headers/timeouts).
-- **`apps/server/pkg/data`** – Domain structs shared across layers (artists, albums, tracks, reviews).
-- **`apps/server/pkg/db`** – Repository interfaces plus memory/SQLite store implementations.
-- **`apps/server/pkg/sources/musicbrainz`** – Client wrapping MusicBrainz REST endpoints (lookup + search) with proper headers and response transforms.
+- **`apps/server/cmd/server`** – Entry point; wires config, datastore, MusicBrainz + Wikipedia clients, HTTP router, and graceful shutdown.
+- **`apps/server/pkg/api`** – HTTP handlers using dependency-injected repositories and external API clients; handles caching logic, CORS, and multi-source data aggregation.
+- **`apps/server/pkg/config`** – Environment-driven configuration supporting MusicBrainz, Wikipedia, database, and server settings.
+- **`apps/server/pkg/data`** – Rich domain structs with comprehensive artist metadata, album details, track information, and biography support.
+- **`apps/server/pkg/db`** – Repository interfaces plus memory/SQLite store implementations with JSON blob caching.
+- **`apps/server/pkg/sources/musicbrainz`** – Comprehensive client with tag filtering, search, artist/album lookups, and track listing integration.
+- **`apps/server/pkg/sources/wikipedia`** – Intelligent biography client with fallback search strategies and content cleaning.
 
 ### Frontend (Angular + Tailwind)
-- **`apps/frontend/src/app/models`** – TypeScript interfaces matching backend API responses.
-- **`apps/frontend/src/app/services`** – Angular services for HTTP communication with the Go backend.
-- **`apps/frontend/src/app/components`** – Reusable UI components including the search component.
-- **`apps/frontend/src/app/pages`** – Route-level components like the homepage with integrated search.
+- **`apps/frontend/src/app/models`** – Rich TypeScript interfaces for artists, albums, tracks, and search results.
+- **`apps/frontend/src/app/services`** – Reactive Angular services with RxJS state management and HTTP caching.
+- **`apps/frontend/src/app/components`** – Professional search component with debouncing and rich result cards.
+- **`apps/frontend/src/app/pages`** – Complete page components: home with search, artist detail with biographies/genres/sorted discographies, and album detail with full track listings.
 
 See `agent-context/development-log.md` for a chronological narrative of how these pieces evolved.
 
@@ -65,43 +67,55 @@ To run both the backend API and frontend simultaneously:
 
 5. **Try It Out**
 	- Visit http://localhost:4200
-	- Search for artists like "Beatles" or "Nirvana"
-	- Click on any artist to view their detailed biography and complete discography
-	- Click on any album to see full track listings with durations
-	- Navigate seamlessly: search → artist → album → tracks
+	- Search for artists like "Beatles", "Nirvana", or "Miles Davis"
+	- **Explore Rich Artist Pages**: Read Wikipedia biographies, browse genre classifications, and view chronologically sorted discographies
+	- **Dive into Albums**: Click any album to see complete track listings with precise durations
+	- **Discover Musical History**: Navigate seamlessly from search → artist biography/genres → chronological albums → detailed tracks
 
 ## Backend Configuration
 
 For backend-only development, you can configure environment variables (optional):
-	Create a `.env` file or export variables. Defaults are sensible for local development:
-	- `APP_ENV` (default `development`)
-	- `PORT` or `HTTP_PORT` (default `8080`)
-	- `SHUTDOWN_TIMEOUT_SECONDS` (default `10`)
-	- `DATABASE_DRIVER` (`memory` or `sqlite`, default `sqlite`)
-	- `DATABASE_URL` (default `file:freqshow.db?_fk=1` when using SQLite)
-	- `MUSICBRAINZ_BASE_URL`, `MUSICBRAINZ_APP_NAME`, `MUSICBRAINZ_APP_VERSION`, `MUSICBRAINZ_CONTACT`, `MUSICBRAINZ_TIMEOUT_SECONDS`
 
-	MusicBrainz requires a contact email and descriptive user agent—update the defaults if you deploy publicly.
+**Server & Database:**
+- `APP_ENV` (default `development`)
+- `PORT` or `HTTP_PORT` (default `8080`)  
+- `SHUTDOWN_TIMEOUT_SECONDS` (default `10`)
+- `DATABASE_DRIVER` (`memory` or `sqlite`, default `sqlite`)
+- `DATABASE_URL` (default `file:freqshow.db?_fk=1` when using SQLite)
+
+**MusicBrainz API:**
+- `MUSICBRAINZ_BASE_URL` (default `https://musicbrainz.org/ws/2`)
+- `MUSICBRAINZ_APP_NAME`, `MUSICBRAINZ_APP_VERSION`, `MUSICBRAINZ_CONTACT`
+- `MUSICBRAINZ_TIMEOUT_SECONDS` (default `6`)
+
+**Wikipedia API:**  
+- `WIKIPEDIA_BASE_URL` (default `https://en.wikipedia.org/api/rest_v1`)
+- `WIKIPEDIA_USER_AGENT` (default `FreqShow/1.0 (https://github.com/adamlacasse/freq-show)`)
+- `WIKIPEDIA_TIMEOUT_SECONDS` (default `8`)
+
+Create a `.env` file or export variables as needed. Defaults are sensible for local development.
+**Note**: MusicBrainz requires a contact email and descriptive user agent—update the defaults if you deploy publicly.
 
 ## API Testing
 
 You can test the backend endpoints directly:
 	```bash
 	curl http://localhost:8080/healthz
-	curl http://localhost:8080/artists/5b11f4ce-a62d-471e-81fc-a69a8278c7da   # Nirvana with full discography
+	curl http://localhost:8080/artists/5b11f4ce-a62d-471e-81fc-a69a8278c7da   # Nirvana with biography, genres, full discography
 	curl http://localhost:8080/albums/1b022e01-4da6-387b-8658-8678046e4cef   # Nevermind with all 12 tracks
 	curl "http://localhost:8080/search?q=beatles&limit=5"                     # Search artists with rich metadata
 	```
 	
-	**Sample Response** (album with tracks):
+	**Sample Response** (artist with biography and genres):
 	```json
 	{
-		"id": "1b022e01-4da6-387b-8658-8678046e4cef",
-		"title": "Nevermind",
-		"tracks": [
-			{"number": 1, "title": "Smells Like Teen Spirit", "length": "5:01"},
-			{"number": 2, "title": "In Bloom", "length": "4:15"},
-			...
+		"id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+		"name": "Nirvana",
+		"biography": "Nirvana was an American rock band formed in Aberdeen, Washington, in 1987. Founded by lead singer and guitarist Kurt Cobain and bassist Krist Novoselic, the band went through a succession of drummers, most notably Dave Grohl, who joined in 1990.",
+		"genres": ["grunge", "alternative rock", "punk rock"],
+		"albums": [
+			{"id": "1b022e01-4da6-387b-8658-8678046e4cef", "title": "Nevermind", "year": 1991},
+			{"id": "7c3218b7-75e0-4e8c-971f-f097b6c308c5", "title": "In Utero", "year": 1993}
 		]
 	}
 	```
@@ -129,33 +143,48 @@ npm start
 
 ## Current Features
 
-- **🔍 Artist Search** - Real-time search with MusicBrainz integration and rich result cards
-- **👤 Artist Detail Pages** - Complete artist information with biography, discography, and metadata
-- **💽 Album Detail Pages** - Full album information with track listings, durations, and release details
-- **🎵 Track Listings** - Complete tracklists with track numbers, titles, and precise durations
-- **🧭 Seamless Navigation** - Intuitive flow from search to artist to album to tracks
-- **🎨 Branded UI** - Dark theme with FreqShow design language and professional typography  
-- **⚡ Fast Backend** - Go API with intelligent MusicBrainz caching and SQLite persistence
-- **🔄 Reactive Frontend** - Angular 17 with RxJS state management and Tailwind CSS
-- **📱 Responsive Design** - Optimized experience on desktop and mobile devices
+### 🎵 Rich Content Integration
+- **� Wikipedia Biographies** - Intelligent artist biography fetching with fallback search strategies and content cleaning
+- **🏷️ Genre Classification** - MusicBrainz tags filtered and classified into meaningful genre information
+- **📅 Chronological Sorting** - Discographies sorted by release year (newest first) with visual year badges
+- **🎶 Complete Track Listings** - Full album tracks with numbers, titles, and precise durations (MM:SS format)
+
+### 🔍 Search & Discovery
+- **⚡ Real-time Search** - Debounced artist search with MusicBrainz integration and rich result cards
+- **🎯 Rich Metadata** - Artist country, type, life spans, aliases, and disambiguation in search results
+- **🧭 Seamless Navigation** - Intuitive flow: search → artist biography/genres → chronological albums → track details
+
+### 🎨 Professional UI/UX
+- **� Branded Dark Theme** - FreqShow design language with teal/rose/amber accent colors
+- **📱 Responsive Design** - Optimized experience on desktop, tablet, and mobile devices  
+- **🎪 Visual Hierarchy** - Color-coded genre tags, prominent year badges, and clear content organization
+- **♿ Accessibility** - Semantic HTML, keyboard navigation, and screen reader friendly
+
+### ⚙️ Technical Excellence
+- **🚀 High-Performance Backend** - Go API with multi-source data aggregation and intelligent caching
+- **💾 Smart Persistence** - SQLite caching for instant subsequent loads of artist/album data
+- **🔄 Reactive Frontend** - Angular 17 with RxJS state management and component-based architecture
+- **� Monorepo Structure** - Clean separation between backend API and frontend applications
 
 ## What's Next
 
 **Enhanced Search & Discovery:**
-- **Album Search** - Extend search to include release groups/albums alongside artists
-- **Search Result Caching** - Cache popular search queries for improved performance
-- **Result Pagination** - Handle large search result sets with proper pagination
+- **Related Artists** - Use MusicBrainz relationship data to show musical connections and similar artists
+- **Album Search** - Extend search to include release groups/albums alongside artists  
+- **Genre Navigation** - Browse artists by genre with filtering and discovery features
+- **Advanced Search** - Filter by genre, year, country, album type, and other metadata
 
-**Content Enrichment:**
-- **Review Integration** - Add curated review excerpts from open sources
-- **Artist Relationships** - Show "similar artists" and musical connections  
-- **Genre Exploration** - Add genre filtering and discovery features
-- **Album Artwork** - Integrate cover art from MusicBrainz Cover Art Archive
+**Visual & Content Enhancements:**
+- **Artist Images** - Integrate artist photos from Last.fm, Discogs, or other sources
+- **Album Artwork** - Display cover art from MusicBrainz Cover Art Archive or external APIs
+- **Review Integration** - Add curated review excerpts from open sources and music journalism
+- **Timeline Views** - Visual artist evolution and music history timelines
 
-**Advanced Features:**
-- **Advanced Search** - Filter by genre, year, country, album type
-- **Personal Collections** - Save favorite artists and albums
-- **Discovery Mode** - Algorithmic recommendations and themed browsing
+**User Experience Features:**
+- **Personal Collections** - Save favorite artists, albums, and create custom playlists
+- **Discovery Mode** - Algorithmic recommendations and themed browsing experiences
+- **Search Result Caching** - Cache popular queries for improved performance and offline capability
+- **Export Features** - Generate shareable artist/album reports and music discovery lists
 
 See `agent-context/development-log.md` for detailed technical roadmap.
 

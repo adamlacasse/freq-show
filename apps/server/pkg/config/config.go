@@ -19,6 +19,9 @@ const (
 	defaultMusicBrainzVer            = "dev"
 	defaultMusicBrainzContact        = "adamlacasse@outlook.com"
 	defaultMusicBrainzTimeoutSeconds = 6
+	defaultWikipediaBase             = "https://en.wikipedia.org/api/rest_v1"
+	defaultWikipediaUserAgent        = "FreqShow/1.0 (https://github.com/adamlacasse/freq-show)"
+	defaultWikipediaTimeoutSeconds   = 8
 
 	shutdownTimeoutEnv       = "SHUTDOWN_TIMEOUT_SECONDS"
 	portEnv                  = "PORT"
@@ -31,6 +34,9 @@ const (
 	musicBrainzAppNameEnv    = "MUSICBRAINZ_APP_NAME"
 	musicBrainzAppVersionEnv = "MUSICBRAINZ_APP_VERSION"
 	musicBrainzContactEnv    = "MUSICBRAINZ_CONTACT"
+	wikipediaBaseURLEnv      = "WIKIPEDIA_BASE_URL"
+	wikipediaTimeoutEnv      = "WIKIPEDIA_TIMEOUT_SECONDS"
+	wikipediaUserAgentEnv    = "WIKIPEDIA_USER_AGENT"
 )
 
 // Config captures runtime configuration derived from environment variables.
@@ -39,6 +45,7 @@ type Config struct {
 	Port            string
 	ShutdownTimeout time.Duration
 	MusicBrainz     MusicBrainzConfig
+	Wikipedia       WikipediaConfig
 	Database        DatabaseConfig
 }
 
@@ -49,6 +56,13 @@ type MusicBrainzConfig struct {
 	AppVersion string
 	Contact    string
 	Timeout    time.Duration
+}
+
+// WikipediaConfig describes how the Wikipedia client should connect.
+type WikipediaConfig struct {
+	BaseURL   string
+	UserAgent string
+	Timeout   time.Duration
 }
 
 // DatabaseConfig describes how application persistence should be configured.
@@ -74,6 +88,11 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	wikipedia, err := resolveWikipedia()
+	if err != nil {
+		return nil, err
+	}
+
 	database, err := resolveDatabase()
 	if err != nil {
 		return nil, err
@@ -86,6 +105,7 @@ func Load() (*Config, error) {
 		Port:            port,
 		ShutdownTimeout: shutdownTimeout,
 		MusicBrainz:     musicBrainz,
+		Wikipedia:       wikipedia,
 		Database:        database,
 	}, nil
 }
@@ -214,5 +234,27 @@ func resolveMusicBrainz() (MusicBrainzConfig, error) {
 		AppVersion: strings.TrimSpace(appVersion),
 		Contact:    strings.TrimSpace(contact),
 		Timeout:    timeout,
+	}, nil
+}
+
+func resolveWikipedia() (WikipediaConfig, error) {
+	baseURL := envOrDefault(wikipediaBaseURLEnv, defaultWikipediaBase)
+	userAgent := envOrDefault(wikipediaUserAgentEnv, defaultWikipediaUserAgent)
+	timeout := time.Duration(defaultWikipediaTimeoutSeconds) * time.Second
+
+	if rawTimeout, ok := lookupNonEmpty(wikipediaTimeoutEnv); ok {
+		seconds, err := strconv.Atoi(rawTimeout)
+		if err != nil {
+			return WikipediaConfig{}, fmt.Errorf("invalid %s value %q: %w", wikipediaTimeoutEnv, rawTimeout, err)
+		}
+		if seconds > 0 {
+			timeout = time.Duration(seconds) * time.Second
+		}
+	}
+
+	return WikipediaConfig{
+		BaseURL:   strings.TrimRight(baseURL, "/"),
+		UserAgent: strings.TrimSpace(userAgent),
+		Timeout:   timeout,
 	}, nil
 }
