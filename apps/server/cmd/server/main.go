@@ -11,6 +11,7 @@ import (
 	"github.com/adamlacasse/freq-show/apps/server/pkg/config"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/db"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/musicbrainz"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/reviews"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/wikipedia"
 )
 
@@ -60,9 +61,18 @@ func main() {
 		log.Fatalf("wikipedia client init failed: %v", err)
 	}
 
+	reviewsClient := reviews.NewClient(reviews.Config{
+		UserAgent:             cfg.Reviews.UserAgent,
+		Timeout:               cfg.Reviews.Timeout,
+		DiscogsToken:          cfg.Reviews.DiscogsToken,
+		DiscogsConsumerKey:    cfg.Reviews.DiscogsConsumerKey,
+		DiscogsConsumerSecret: cfg.Reviews.DiscogsConsumerSecret,
+	})
+
 	router := api.NewRouter(api.RouterConfig{
 		MusicBrainz: mbClient,
 		Wikipedia:   wikiClient,
+		Reviews:     reviewsClient,
 		Artists:     store,
 		Albums:      store,
 	})

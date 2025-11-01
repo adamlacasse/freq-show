@@ -22,21 +22,28 @@ const (
 	defaultWikipediaBase             = "https://en.wikipedia.org/api/rest_v1"
 	defaultWikipediaUserAgent        = "FreqShow/1.0 (https://github.com/adamlacasse/freq-show)"
 	defaultWikipediaTimeoutSeconds   = 8
+	defaultReviewsUserAgent          = "FreqShow/1.0 (https://github.com/adamlacasse/freq-show)"
+	defaultReviewsTimeoutSeconds     = 10
 
-	shutdownTimeoutEnv       = "SHUTDOWN_TIMEOUT_SECONDS"
-	portEnv                  = "PORT"
-	httpPortEnv              = "HTTP_PORT"
-	environmentEnv           = "APP_ENV"
-	databaseDriverEnv        = "DATABASE_DRIVER"
-	databaseURLEnv           = "DATABASE_URL"
-	musicBrainzBaseURLEnv    = "MUSICBRAINZ_BASE_URL"
-	musicBrainzTimeoutEnv    = "MUSICBRAINZ_TIMEOUT_SECONDS"
-	musicBrainzAppNameEnv    = "MUSICBRAINZ_APP_NAME"
-	musicBrainzAppVersionEnv = "MUSICBRAINZ_APP_VERSION"
-	musicBrainzContactEnv    = "MUSICBRAINZ_CONTACT"
-	wikipediaBaseURLEnv      = "WIKIPEDIA_BASE_URL"
-	wikipediaTimeoutEnv      = "WIKIPEDIA_TIMEOUT_SECONDS"
-	wikipediaUserAgentEnv    = "WIKIPEDIA_USER_AGENT"
+	shutdownTimeoutEnv              = "SHUTDOWN_TIMEOUT_SECONDS"
+	portEnv                         = "PORT"
+	httpPortEnv                     = "HTTP_PORT"
+	environmentEnv                  = "APP_ENV"
+	databaseDriverEnv               = "DATABASE_DRIVER"
+	databaseURLEnv                  = "DATABASE_URL"
+	musicBrainzBaseURLEnv           = "MUSICBRAINZ_BASE_URL"
+	musicBrainzTimeoutEnv           = "MUSICBRAINZ_TIMEOUT_SECONDS"
+	musicBrainzAppNameEnv           = "MUSICBRAINZ_APP_NAME"
+	musicBrainzAppVersionEnv        = "MUSICBRAINZ_APP_VERSION"
+	musicBrainzContactEnv           = "MUSICBRAINZ_CONTACT"
+	wikipediaBaseURLEnv             = "WIKIPEDIA_BASE_URL"
+	wikipediaTimeoutEnv             = "WIKIPEDIA_TIMEOUT_SECONDS"
+	wikipediaUserAgentEnv           = "WIKIPEDIA_USER_AGENT"
+	reviewsUserAgentEnv             = "REVIEWS_USER_AGENT"
+	reviewsTimeoutEnv               = "REVIEWS_TIMEOUT_SECONDS"
+	reviewsDiscogsTokenEnv          = "REVIEWS_DISCOGS_TOKEN"
+	reviewsDiscogsConsumerKeyEnv    = "REVIEWS_DISCOGS_CONSUMER_KEY"
+	reviewsDiscogsConsumerSecretEnv = "REVIEWS_DISCOGS_CONSUMER_SECRET"
 )
 
 // Config captures runtime configuration derived from environment variables.
@@ -46,6 +53,7 @@ type Config struct {
 	ShutdownTimeout time.Duration
 	MusicBrainz     MusicBrainzConfig
 	Wikipedia       WikipediaConfig
+	Reviews         ReviewsConfig
 	Database        DatabaseConfig
 }
 
@@ -63,6 +71,15 @@ type WikipediaConfig struct {
 	BaseURL   string
 	UserAgent string
 	Timeout   time.Duration
+}
+
+// ReviewsConfig describes how the reviews client should connect.
+type ReviewsConfig struct {
+	UserAgent             string
+	Timeout               time.Duration
+	DiscogsToken          string
+	DiscogsConsumerKey    string
+	DiscogsConsumerSecret string
 }
 
 // DatabaseConfig describes how application persistence should be configured.
@@ -93,6 +110,11 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	reviews, err := resolveReviews()
+	if err != nil {
+		return nil, err
+	}
+
 	database, err := resolveDatabase()
 	if err != nil {
 		return nil, err
@@ -106,6 +128,7 @@ func Load() (*Config, error) {
 		ShutdownTimeout: shutdownTimeout,
 		MusicBrainz:     musicBrainz,
 		Wikipedia:       wikipedia,
+		Reviews:         reviews,
 		Database:        database,
 	}, nil
 }
@@ -256,5 +279,31 @@ func resolveWikipedia() (WikipediaConfig, error) {
 		BaseURL:   strings.TrimRight(baseURL, "/"),
 		UserAgent: strings.TrimSpace(userAgent),
 		Timeout:   timeout,
+	}, nil
+}
+
+func resolveReviews() (ReviewsConfig, error) {
+	userAgent := envOrDefault(reviewsUserAgentEnv, defaultReviewsUserAgent)
+	discogsToken := envOrDefault(reviewsDiscogsTokenEnv, "")
+	discogsConsumerKey := envOrDefault(reviewsDiscogsConsumerKeyEnv, "")
+	discogsConsumerSecret := envOrDefault(reviewsDiscogsConsumerSecretEnv, "")
+	timeout := time.Duration(defaultReviewsTimeoutSeconds) * time.Second
+
+	if rawTimeout, ok := lookupNonEmpty(reviewsTimeoutEnv); ok {
+		seconds, err := strconv.Atoi(rawTimeout)
+		if err != nil {
+			return ReviewsConfig{}, fmt.Errorf("invalid %s value %q: %w", reviewsTimeoutEnv, rawTimeout, err)
+		}
+		if seconds > 0 {
+			timeout = time.Duration(seconds) * time.Second
+		}
+	}
+
+	return ReviewsConfig{
+		UserAgent:             strings.TrimSpace(userAgent),
+		DiscogsToken:          strings.TrimSpace(discogsToken),
+		DiscogsConsumerKey:    strings.TrimSpace(discogsConsumerKey),
+		DiscogsConsumerSecret: strings.TrimSpace(discogsConsumerSecret),
+		Timeout:               timeout,
 	}, nil
 }

@@ -4,14 +4,15 @@
 
 **Deep cuts, no ads.** A music encyclopedia for listeners who still read liner notes.
 
-> **Current Status**: Fully functional music encyclopedia with artist search, rich artist biographies from Wikipedia, genre classification, chronologically sorted discographies, complete album pages with track listings, and seamless navigation. Features professional dark theme UI and intelligent data caching. [Try it live](#quick-start) by searching for artists like "Nirvana" or "Beatles" to explore their biographies, genres, and complete chronological discographies!
+> **Current Status**: Fully functional music encyclopedia with artist search, rich artist biographies from Wikipedia, genre classification, chronologically sorted discographies, complete album pages with track listings, community reviews and ratings from Discogs, and seamless navigation. Features professional dark theme UI and intelligent data caching. [Try it live](#quick-start) by searching for artists like "Nirvana" or "Beatles" to explore their biographies, genres, discographies, and album reviews!
 
 ## What This Repo Contains
 - **Modern Monorepo**: Clean layout with application code under `apps/` and room for shared libraries in `packages/`.
 - **Go 1.22 Backend** (`apps/server`): High-performance API that integrates MusicBrainz metadata with Wikipedia biographies, intelligent genre classification, and comprehensive caching.
-- **Multi-Source Data Integration**: MusicBrainz API for structured music data + Wikipedia API for artist biographies with smart fallback strategies.
+- **Multi-Source Data Integration**: MusicBrainz API for structured music data + Wikipedia API for artist biographies + Discogs API for community reviews and ratings.
+- **Album Reviews**: Community ratings and detailed release information from Discogs using OAuth authentication.
 - **Pluggable Architecture**: In-memory and SQLite persistence implementations with full dependency injection.
-- **Rich REST API**: `/healthz`, `/artists/{mbid}`, `/albums/{mbid}`, and `/search?q={query}` endpoints serving complete artist/album data with genres, biographies, and track listings.
+- **Rich REST API**: `/healthz`, `/artists/{mbid}`, `/albums/{mbid}`, and `/search?q={query}` endpoints serving complete artist/album data with genres, biographies, track listings, and community reviews.
 - **Angular 17 Frontend** (`apps/frontend`): Professional UI with search, artist detail pages with biographies and genres, album detail pages, chronological discography sorting, and seamless navigation.
 - **Comprehensive Documentation**: Development log in `agent-context/development-log.md` capturing architectural decisions and evolution.
 
@@ -25,6 +26,7 @@
 - **`apps/server/pkg/db`** – Repository interfaces plus memory/SQLite store implementations with JSON blob caching.
 - **`apps/server/pkg/sources/musicbrainz`** – Comprehensive client with tag filtering, search, artist/album lookups, and track listing integration.
 - **`apps/server/pkg/sources/wikipedia`** – Intelligent biography client with fallback search strategies and content cleaning.
+- **`apps/server/pkg/sources/reviews`** – Discogs API integration for community reviews, ratings, and release information using OAuth authentication.
 
 ### Frontend (Angular + Tailwind)
 - **`apps/frontend/src/app/models`** – Rich TypeScript interfaces for artists, albums, tracks, and search results.
@@ -49,15 +51,23 @@ To run both the backend API and frontend simultaneously:
 	cd freq-show
 	```
 
-3. **Start Backend** (Terminal 1)
+3. **Configure Environment** (First time only)
+	```bash
+	# The .env file in the repo root already has OAuth credentials configured
+	# No action needed - the run script will load it automatically
+	```
+
+4. **Start Backend** (Terminal 1)
 	```bash
 	cd apps/server
 	go mod download
-	go run ./cmd/server/main.go
+	go build ./cmd/server
+	./run.sh
 	# Backend runs on http://localhost:8080
+	# Loads OAuth credentials from .env automatically
 	```
 
-4. **Start Frontend** (Terminal 2)
+5. **Start Frontend** (Terminal 2)
 	```bash
 	cd apps/frontend
 	npm install
@@ -65,12 +75,13 @@ To run both the backend API and frontend simultaneously:
 	# Frontend runs on http://localhost:4200
 	```
 
-5. **Try It Out**
+6. **Try It Out**
 	- Visit http://localhost:4200
 	- Search for artists like "Beatles", "Nirvana", or "Miles Davis"
 	- **Explore Rich Artist Pages**: Read Wikipedia biographies, browse genre classifications, and view chronologically sorted discographies
-	- **Dive into Albums**: Click any album to see complete track listings with precise durations
-	- **Discover Musical History**: Navigate seamlessly from search → artist biography/genres → chronological albums → detailed tracks
+	- **Dive into Albums**: Click any album to see complete track listings with precise durations and community reviews
+	- **Read Community Reviews**: View Discogs ratings and detailed release information for albums
+	- **Discover Musical History**: Navigate seamlessly from search → artist biography/genres → chronological albums → detailed tracks + reviews
 
 ## Backend Configuration
 
@@ -93,8 +104,14 @@ For backend-only development, you can configure environment variables (optional)
 - `WIKIPEDIA_USER_AGENT` (default `FreqShow/1.0 (https://github.com/adamlacasse/freq-show)`)
 - `WIKIPEDIA_TIMEOUT_SECONDS` (default `8`)
 
-Create a `.env` file or export variables as needed. Defaults are sensible for local development.
-**Note**: MusicBrainz requires a contact email and descriptive user agent—update the defaults if you deploy publicly.
+**Reviews API (Discogs):**
+- `REVIEWS_USER_AGENT` (default `FreqShow/1.0 +https://github.com/adamlacasse/freq-show`)
+- `REVIEWS_TIMEOUT_SECONDS` (default `10`)
+- `REVIEWS_DISCOGS_CONSUMER_KEY` – Your Discogs OAuth consumer key (required for reviews)
+- `REVIEWS_DISCOGS_CONSUMER_SECRET` – Your Discogs OAuth consumer secret (required for reviews)
+- `REVIEWS_DISCOGS_TOKEN` – Optional personal access token (alternative to OAuth)
+
+**Note**: The `.env` file already includes Discogs OAuth credentials for development. Reviews will be fetched automatically when you use the `run.sh` script. MusicBrainz requires a contact email and descriptive user agent—update the defaults if you deploy publicly.
 
 ## API Testing
 

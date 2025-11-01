@@ -2,12 +2,13 @@
 
 ## Project Architecture
 
-This is a **Go + Angular monorepo** for a music encyclopedia app that proxies MusicBrainz API with caching.
+This is a **Go + Angular monorepo** for a music encyclopedia app that integrates MusicBrainz, Wikipedia, and Discogs APIs with caching.
 
 ### Key Directories
 - `apps/server/` - Go 1.22 backend with layered architecture 
 - `apps/frontend/` - Angular 17 + Tailwind frontend with SSR support
 - `agent-context/development-log.md` - Chronicles architectural decisions and evolution
+- `.env` - Environment configuration with API credentials (OAuth for Discogs reviews)
 
 ## Backend Patterns (Go)
 
@@ -17,6 +18,8 @@ The app uses explicit DI throughout. Main wiring happens in `apps/server/cmd/ser
 // Router gets injected dependencies via RouterConfig
 api.NewRouter(api.RouterConfig{
     MusicBrainz: mbClient,
+    Wikipedia:   wikiClient,
+    Reviews:     reviewsClient,
     Artists:     store, 
     Albums:      store,
 })
@@ -31,15 +34,17 @@ api.NewRouter(api.RouterConfig{
 All `/artists/{mbid}` and `/albums/{mbid}` endpoints follow this pattern:
 1. Check local repository first (`store.GetArtist()`)
 2. If cache miss, fetch from MusicBrainz API 
-3. Transform external response to internal `data.Artist`/`data.Album` structs
-4. Save to repository (`store.SaveArtist()`) 
-5. Return cached result
+3. Fetch supplementary data (Wikipedia biographies, Discogs reviews)
+4. Transform external response to internal `data.Artist`/`data.Album` structs
+5. Save to repository (`store.SaveArtist()`) 
+6. Return cached result
 
 ### Environment-Driven Configuration
 Configuration in `apps/server/pkg/config/config.go` uses environment variables with sensible defaults:
 - `DATABASE_DRIVER=sqlite` (or `memory` for testing)
 - `DATABASE_URL=file:freqshow.db?_fk=1`
 - `MUSICBRAINZ_TIMEOUT_SECONDS=6`
+- `REVIEWS_DISCOGS_CONSUMER_KEY` and `REVIEWS_DISCOGS_CONSUMER_SECRET` for OAuth
 
 ## Frontend Patterns (Angular)
 
@@ -59,7 +64,8 @@ public searchResults$ = this.searchResultsSubject.asObservable();
 ### Running the Stack
 ```bash
 # Terminal 1: Backend (from repo root)
-cd apps/server && go run ./cmd/server
+cd apps/server && go build ./cmd/server && ./run.sh
+# This loads .env with OAuth credentials automatically
 
 # Terminal 2: Frontend (from repo root)  
 cd apps/frontend && npm start
@@ -75,16 +81,29 @@ Change `DATABASE_DRIVER` env var:
 - `memory` - In-memory storage (tests, rapid iteration)
 - `sqlite` - Persistent SQLite (development, production)
 
-## MusicBrainz Integration
+## External API Integration
 
-### Client Pattern
+### MusicBrainz Integration
 `apps/server/pkg/sources/musicbrainz/client.go` implements proper API etiquette:
 - Required User-Agent headers with app identification
 - Configurable timeouts and rate limiting
 - Transforms external JSON to internal domain structs
 
+### Wikipedia Integration
+`apps/server/pkg/sources/wikipedia/client.go` fetches artist biographies:
+- Intelligent fallback search strategies (artist name, "band", "musician" variations)
+- Content cleaning and length limiting
+- Graceful error handling
+
+### Discogs Reviews Integration
+`apps/server/pkg/sources/reviews/client.go` fetches album reviews and ratings:
+- OAuth consumer key/secret authentication via query parameters
+- Multi-source aggregation pattern (currently Discogs, extensible for future sources)
+- Community ratings, release notes, and metadata
+- Graceful degradation (albums work even if reviews fail)
+
 ### Error Handling
-APIs return 404 when MusicBrainz has no data (vs 500 for actual errors). This distinction matters for caching behavior.
+APIs return 404 when no data exists (vs 500 for actual errors). This distinction matters for caching behavior.
 
 ## Key Conventions
 
@@ -97,6 +116,7 @@ Always use full module paths: `github.com/adamlacasse/freq-show/apps/server/pkg/
 - Test helpers use `t.Fatalf()` for setup failures, `t.Errorf()` for assertion failures
 
 ### File Organization
-- Each package has clear single responsibility (`api`, `db`, `config`, `data`, `sources/musicbrainz`)
+- Each package has clear single responsibility (`api`, `db`, `config`, `data`, `sources/musicbrainz`, `sources/wikipedia`, `sources/reviews`)
 - Tests live alongside code, not in separate directories
 - Shared domain models in `pkg/data/` avoid circular dependencies
+- Environment variables loaded from `.env` via `run.sh` script

@@ -99,7 +99,18 @@ func (s *stubWikipedia) GetArtistBiography(ctx context.Context, artistName strin
 	if s.getArtistBiographyFunc != nil {
 		return s.getArtistBiographyFunc(ctx, artistName)
 	}
-	return "", nil // Return empty biography by default for tests
+	return "", errors.New(unexpectedCall)
+}
+
+type stubReviews struct {
+	getAlbumReviewFunc func(ctx context.Context, artistName, albumTitle string) (*data.Review, error)
+}
+
+func (s *stubReviews) GetAlbumReview(ctx context.Context, artistName, albumTitle string) (*data.Review, error) {
+	if s.getAlbumReviewFunc != nil {
+		return s.getAlbumReviewFunc(ctx, artistName, albumTitle)
+	}
+	return &data.Review{}, nil // Return empty review by default
 }
 
 type stubAlbumRepo struct {
@@ -316,7 +327,7 @@ func TestAlbumLookupHandlerReturnsCachedAlbum(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, albumPath, nil)
 	res := httptest.NewRecorder()
 
-	albumLookupHandler(repo, mb).ServeHTTP(res, req)
+	albumLookupHandler(repo, mb, &stubReviews{}).ServeHTTP(res, req)
 
 	if res.Code != http.StatusOK {
 		t.Fatalf(status200Fmt, res.Code)
@@ -373,7 +384,7 @@ func TestAlbumLookupHandlerFetchesAndCaches(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, albumPath, nil)
 	res := httptest.NewRecorder()
 
-	albumLookupHandler(repo, mb).ServeHTTP(res, req)
+	albumLookupHandler(repo, mb, &stubReviews{}).ServeHTTP(res, req)
 
 	if res.Code != http.StatusOK {
 		t.Fatalf(status200Fmt, res.Code)
@@ -402,7 +413,7 @@ func TestAlbumLookupHandlerNotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, missingAlbum, nil)
 	res := httptest.NewRecorder()
 
-	albumLookupHandler(repo, mb).ServeHTTP(res, req)
+	albumLookupHandler(repo, mb, &stubReviews{}).ServeHTTP(res, req)
 
 	if res.Code != http.StatusNotFound {
 		t.Fatalf("expected status 404, got %d", res.Code)
@@ -416,7 +427,7 @@ func TestAlbumLookupHandlerBadRequest(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, baseAlbumPath, nil)
 	res := httptest.NewRecorder()
 
-	albumLookupHandler(repo, mb).ServeHTTP(res, req)
+	albumLookupHandler(repo, mb, &stubReviews{}).ServeHTTP(res, req)
 
 	if res.Code != http.StatusBadRequest {
 		t.Fatalf(status400Fmt, res.Code)

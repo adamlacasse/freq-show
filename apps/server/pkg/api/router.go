@@ -27,10 +27,16 @@ type WikipediaClient interface {
 	GetArtistBiography(ctx context.Context, artistName string) (string, error)
 }
 
+// ReviewsClient captures the reviews operations the router relies on.
+type ReviewsClient interface {
+	GetAlbumReview(ctx context.Context, artistName, albumTitle string) (*data.Review, error)
+}
+
 // RouterConfig captures dependencies required by the HTTP router.
 type RouterConfig struct {
 	MusicBrainz MusicBrainzClient
 	Wikipedia   WikipediaClient
+	Reviews     ReviewsClient
 	Artists     db.ArtistRepository
 	Albums      db.AlbumRepository
 }
@@ -40,7 +46,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", healthHandler)
 	mux.Handle("/artists/", artistLookupHandler(cfg.Artists, cfg.MusicBrainz, cfg.Wikipedia))
-	mux.Handle("/albums/", albumLookupHandler(cfg.Albums, cfg.MusicBrainz))
+	mux.Handle("/albums/", albumLookupHandler(cfg.Albums, cfg.MusicBrainz, cfg.Reviews))
 	mux.HandleFunc("/search", searchHandler(cfg.MusicBrainz))
 	return corsMiddleware(mux)
 }
@@ -75,7 +81,7 @@ func artistLookupHandler(repo db.ArtistRepository, mbClient MusicBrainzClient, w
 	})
 }
 
-func albumLookupHandler(repo db.AlbumRepository, client MusicBrainzClient) http.Handler {
+func albumLookupHandler(repo db.AlbumRepository, client MusicBrainzClient, reviewsClient ReviewsClient) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !assertMethod(w, r, http.MethodGet) {
 			return
@@ -87,7 +93,7 @@ func albumLookupHandler(repo db.AlbumRepository, client MusicBrainzClient) http.
 			return
 		}
 
-		album, err := getOrFetchAlbum(r.Context(), repo, client, id)
+		album, err := getOrFetchAlbum(r.Context(), repo, client, reviewsClient, id)
 		if err != nil {
 			handleAPIError(w, err)
 			return
@@ -226,7 +232,7 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, mbClient Mu
 	return domainArtist, nil
 }
 
-func getOrFetchAlbum(ctx context.Context, repo db.AlbumRepository, client MusicBrainzClient, id string) (*data.Album, error) {
+func getOrFetchAlbum(ctx context.Context, repo db.AlbumRepository, client MusicBrainzClient, reviewsClient ReviewsClient, id string) (*data.Album, error) {
 	if repo != nil {
 		album, err := repo.GetAlbum(ctx, id)
 		if err != nil {
@@ -259,6 +265,15 @@ func getOrFetchAlbum(ctx context.Context, repo db.AlbumRepository, client MusicB
 		domainAlbum.Tracks = transformTracks(tracks)
 	}
 	// If track fetching fails, we continue without tracks rather than failing the whole request
+
+	// Fetch review data
+	if reviewsClient != nil {
+		review, err := reviewsClient.GetAlbumReview(ctx, domainAlbum.ArtistName, domainAlbum.Title)
+		if err == nil && review != nil {
+			domainAlbum.Review = *review
+		}
+	}
+	// If review fetching fails, we continue without reviews rather than failing the whole request
 
 	if repo != nil {
 		if err := repo.SaveAlbum(ctx, domainAlbum); err != nil {
