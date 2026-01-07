@@ -7,6 +7,7 @@
 > **Current Status**: Fully functional music encyclopedia with artist search, rich artist biographies from Wikipedia, genre classification, chronologically sorted discographies, complete album pages with track listings, community reviews and ratings from Discogs, and seamless navigation. Features professional dark theme UI and intelligent data caching. [Try it live](#quick-start) by searching for artists like "Nirvana" or "Beatles" to explore their biographies, genres, discographies, and album reviews!
 
 ## What This Repo Contains
+
 - **Modern Monorepo**: Clean layout with application code under `apps/` and room for shared libraries in `packages/`.
 - **Go 1.22 Backend** (`apps/server`): High-performance API that integrates MusicBrainz metadata with Wikipedia biographies, intelligent genre classification, and comprehensive caching.
 - **Multi-Source Data Integration**: MusicBrainz API for structured music data + Wikipedia API for artist biographies + Discogs API for community reviews and ratings.
@@ -19,6 +20,7 @@
 ## Architecture at a Glance
 
 ### Backend (Go)
+
 - **`apps/server/cmd/server`** – Entry point; wires config, datastore, MusicBrainz + Wikipedia clients, HTTP router, and graceful shutdown.
 - **`apps/server/pkg/api`** – HTTP handlers using dependency-injected repositories and external API clients; handles caching logic, CORS, and multi-source data aggregation.
 - **`apps/server/pkg/config`** – Environment-driven configuration supporting MusicBrainz, Wikipedia, database, and server settings.
@@ -29,6 +31,7 @@
 - **`apps/server/pkg/sources/reviews`** – Discogs API integration for community reviews, ratings, and release information using OAuth authentication.
 
 ### Frontend (Angular + Tailwind)
+
 - **`apps/frontend/src/app/models`** – Rich TypeScript interfaces for artists, albums, tracks, and search results.
 - **`apps/frontend/src/app/services`** – Reactive Angular services with RxJS state management and HTTP caching.
 - **`apps/frontend/src/app/components`** – Professional search component with debouncing and rich result cards.
@@ -41,53 +44,60 @@ See `agent-context/development-log.md` for a chronological narrative of how thes
 To run both the backend API and frontend simultaneously:
 
 1. **Prerequisites**
-	- Go 1.22+
-	- Node.js 18+ and npm
-	- (Optional) SQLite if you want to inspect the generated database file
 
-2. **Clone and Install**
-	```bash
-	git clone https://github.com/adamlacasse/freq-show.git
-	cd freq-show
-	```
+- Go 1.22+
+- Node.js 18+ and npm
+- (Optional) SQLite if you want to inspect the generated database file
 
-3. **Configure Environment** (First time only)
-	```bash
-	# The .env file in the repo root already has OAuth credentials configured
-	# No action needed - the run script will load it automatically
-	```
+1. **Clone and Install**
 
-4. **Start Backend** (Terminal 1)
-	```bash
-	cd apps/server
-	go mod download
-	go build ./cmd/server
-	./run.sh
-	# Backend runs on http://localhost:8080
-	# Loads OAuth credentials from .env automatically
-	```
+ ```bash
+ git clone https://github.com/adamlacasse/freq-show.git
+ cd freq-show
+ ```
 
-5. **Start Frontend** (Terminal 2)
-	```bash
-	cd apps/frontend
-	npm install
-	npm start
-	# Frontend runs on http://localhost:4200
-	```
+1. **Configure Environment** (First time only)
 
-6. **Try It Out**
-	- Visit http://localhost:4200
-	- Search for artists like "Beatles", "Nirvana", or "Miles Davis"
-	- **Explore Rich Artist Pages**: Read Wikipedia biographies, browse genre classifications, and view chronologically sorted discographies
-	- **Dive into Albums**: Click any album to see complete track listings with precise durations and community reviews
-	- **Read Community Reviews**: View Discogs ratings and detailed release information for albums
-	- **Discover Musical History**: Navigate seamlessly from search → artist biography/genres → chronological albums → detailed tracks + reviews
+ ```bash
+ # The .env file in the repo root already has OAuth credentials configured
+ # No action needed - the run script will load it automatically
+ ```
+
+1. **Start Backend** (Terminal 1)
+
+ ```bash
+ cd apps/server
+ go mod download
+ go build ./cmd/server
+ ./run.sh
+ # Backend runs on http://localhost:8080
+ # Loads OAuth credentials from .env automatically
+ ```
+
+1. **Start Frontend** (Terminal 2)
+
+ ```bash
+ cd apps/frontend
+ npm install
+ npm start
+ # Frontend runs on http://localhost:4200
+ ```
+
+1. **Try It Out**
+
+- Visit <http://localhost:4200>
+- Search for artists like "Beatles", "Nirvana", or "Miles Davis"
+- **Explore Rich Artist Pages**: Read Wikipedia biographies, browse genre classifications, and view chronologically sorted discographies
+- **Dive into Albums**: Click any album to see complete track listings with precise durations and community reviews
+- **Read Community Reviews**: View Discogs ratings and detailed release information for albums
+- **Discover Musical History**: Navigate seamlessly from search → artist biography/genres → chronological albums → detailed tracks + reviews
 
 ## Backend Configuration
 
 For backend-only development, you can configure environment variables (optional):
 
 **Server & Database:**
+
 - `APP_ENV` (default `development`)
 - `PORT` or `HTTP_PORT` (default `8080`)  
 - `SHUTDOWN_TIMEOUT_SECONDS` (default `10`)
@@ -95,16 +105,19 @@ For backend-only development, you can configure environment variables (optional)
 - `DATABASE_URL` (default `file:freqshow.db?_fk=1` when using SQLite)
 
 **MusicBrainz API:**
+
 - `MUSICBRAINZ_BASE_URL` (default `https://musicbrainz.org/ws/2`)
 - `MUSICBRAINZ_APP_NAME`, `MUSICBRAINZ_APP_VERSION`, `MUSICBRAINZ_CONTACT`
 - `MUSICBRAINZ_TIMEOUT_SECONDS` (default `6`)
 
 **Wikipedia API:**  
+
 - `WIKIPEDIA_BASE_URL` (default `https://en.wikipedia.org/api/rest_v1`)
 - `WIKIPEDIA_USER_AGENT` (default `FreqShow/1.0 (https://github.com/adamlacasse/freq-show)`)
 - `WIKIPEDIA_TIMEOUT_SECONDS` (default `8`)
 
 **Reviews API (Discogs):**
+
 - `REVIEWS_USER_AGENT` (default `FreqShow/1.0 +https://github.com/adamlacasse/freq-show`)
 - `REVIEWS_TIMEOUT_SECONDS` (default `10`)
 - `REVIEWS_DISCOGS_CONSUMER_KEY` – Your Discogs OAuth consumer key (required for reviews)
@@ -116,35 +129,39 @@ For backend-only development, you can configure environment variables (optional)
 ## API Testing
 
 You can test the backend endpoints directly:
-	```bash
-	curl http://localhost:8080/healthz
-	curl http://localhost:8080/artists/5b11f4ce-a62d-471e-81fc-a69a8278c7da   # Nirvana with biography, genres, full discography
-	curl http://localhost:8080/albums/1b022e01-4da6-387b-8658-8678046e4cef   # Nevermind with all 12 tracks
-	curl "http://localhost:8080/search?q=beatles&limit=5"                     # Search artists with rich metadata
-	```
-	
-	**Sample Response** (artist with biography and genres):
-	```json
-	{
-		"id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
-		"name": "Nirvana",
-		"biography": "Nirvana was an American rock band formed in Aberdeen, Washington, in 1987. Founded by lead singer and guitarist Kurt Cobain and bassist Krist Novoselic, the band went through a succession of drummers, most notably Dave Grohl, who joined in 1990.",
-		"genres": ["grunge", "alternative rock", "punk rock"],
-		"albums": [
-			{"id": "1b022e01-4da6-387b-8658-8678046e4cef", "title": "Nevermind", "year": 1991},
-			{"id": "7c3218b7-75e0-4e8c-971f-f097b6c308c5", "title": "In Utero", "year": 1993}
-		]
-	}
-	```
+
+ ```bash
+ curl http://localhost:8080/healthz
+ curl http://localhost:8080/artists/5b11f4ce-a62d-471e-81fc-a69a8278c7da   # Nirvana with biography, genres, full discography
+ curl http://localhost:8080/albums/1b022e01-4da6-387b-8658-8678046e4cef   # Nevermind with all 12 tracks
+ curl "http://localhost:8080/search?q=beatles&limit=5"                     # Search artists with rich metadata
+ ```
+
+ **Sample Response** (artist with biography and genres):
+
+ ```json
+ {
+  "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+  "name": "Nirvana",
+  "biography": "Nirvana was an American rock band formed in Aberdeen, Washington, in 1987. Founded by lead singer and guitarist Kurt Cobain and bassist Krist Novoselic, the band went through a succession of drummers, most notably Dave Grohl, who joined in 1990.",
+  "genres": ["grunge", "alternative rock", "punk rock"],
+  "albums": [
+   {"id": "1b022e01-4da6-387b-8658-8678046e4cef", "title": "Nevermind", "year": 1991},
+   {"id": "7c3218b7-75e0-4e8c-971f-f097b6c308c5", "title": "In Utero", "year": 1993}
+  ]
+ }
+ ```
 
 ## Development
 
-**Run Tests** (from `apps/server`)
+### Run Tests (from `apps/server`)
+
 ```bash
 go test ./...
 ```
 
-**Frontend Development Server**
+### Frontend Development Server
+
 ```bash
 cd apps/frontend
 npm start
@@ -152,6 +169,7 @@ npm start
 ```
 
 ## Development Notes
+
 - **Caching Strategy**: First request fetches from MusicBrainz; subsequent requests return cached payload from SQLite.
 - **Database**: SQLite stores JSON blobs—use `jq` or SQL queries to inspect: `sqlite3 apps/server/freqshow.db ".tables"`
 - **CORS**: Enabled for `http://localhost:4200` in development mode.
@@ -161,23 +179,27 @@ npm start
 ## Current Features
 
 ### 🎵 Rich Content Integration
+
 - **� Wikipedia Biographies** - Intelligent artist biography fetching with fallback search strategies and content cleaning
 - **🏷️ Genre Classification** - MusicBrainz tags filtered and classified into meaningful genre information
 - **📅 Chronological Sorting** - Discographies sorted by release year (newest first) with visual year badges
 - **🎶 Complete Track Listings** - Full album tracks with numbers, titles, and precise durations (MM:SS format)
 
 ### 🔍 Search & Discovery
+
 - **⚡ Real-time Search** - Debounced artist search with MusicBrainz integration and rich result cards
 - **🎯 Rich Metadata** - Artist country, type, life spans, aliases, and disambiguation in search results
 - **🧭 Seamless Navigation** - Intuitive flow: search → artist biography/genres → chronological albums → track details
 
 ### 🎨 Professional UI/UX
+
 - **� Branded Dark Theme** - FreqShow design language with teal/rose/amber accent colors
 - **📱 Responsive Design** - Optimized experience on desktop, tablet, and mobile devices  
 - **🎪 Visual Hierarchy** - Color-coded genre tags, prominent year badges, and clear content organization
 - **♿ Accessibility** - Semantic HTML, keyboard navigation, and screen reader friendly
 
 ### ⚙️ Technical Excellence
+
 - **🚀 High-Performance Backend** - Go API with multi-source data aggregation and intelligent caching
 - **💾 Smart Persistence** - SQLite caching for instant subsequent loads of artist/album data
 - **🔄 Reactive Frontend** - Angular 17 with RxJS state management and component-based architecture
@@ -186,18 +208,21 @@ npm start
 ## What's Next
 
 **Enhanced Search & Discovery:**
+
 - **Related Artists** - Use MusicBrainz relationship data to show musical connections and similar artists
 - **Album Search** - Extend search to include release groups/albums alongside artists  
 - **Genre Navigation** - Browse artists by genre with filtering and discovery features
 - **Advanced Search** - Filter by genre, year, country, album type, and other metadata
 
 **Visual & Content Enhancements:**
+
 - **Artist Images** - Integrate artist photos from Last.fm, Discogs, or other sources
 - **Album Artwork** - Display cover art from MusicBrainz Cover Art Archive or external APIs
 - **Review Integration** - Add curated review excerpts from open sources and music journalism
 - **Timeline Views** - Visual artist evolution and music history timelines
 
 **User Experience Features:**
+
 - **Personal Collections** - Save favorite artists, albums, and create custom playlists
 - **Discovery Mode** - Algorithmic recommendations and themed browsing experiences
 - **Search Result Caching** - Cache popular queries for improved performance and offline capability
@@ -205,4 +230,12 @@ npm start
 
 See `agent-context/development-log.md` for detailed technical roadmap.
 
-Questions or suggestions? Open an issue or drop a note.🎶
+Questions or suggestions? Open an issue or drop a note! 🎶
+
+---
+
+<br>
+
+Brought to you by
+
+[![Lacasse Solutions](docs/img/lacasse-solutions.png)](https://adamlacasse.dev)
