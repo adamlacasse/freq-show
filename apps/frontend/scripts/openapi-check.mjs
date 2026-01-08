@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 const frontendRoot = path.resolve(import.meta.dirname, '..');
-const specPath = path.resolve(frontendRoot, '..', '..', 'docs', 'openapi.yaml');
+const specPath = path.resolve(frontendRoot, '..', '..', 'specs', 'openapi.yaml');
 const generatedPath = path.resolve(frontendRoot, 'src', 'app', 'models', 'openapi-types.generated.ts');
 
 const binName = process.platform === 'win32' ? 'openapi-typescript.cmd' : 'openapi-typescript';

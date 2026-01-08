@@ -1,3 +1,7 @@
+# Start here
+- specs/index.md — authoritative entry point; specs win over README or agent-context
+- specs/openapi.yaml — HTTP contract and generated frontend types source of truth
+
 # FreqShow Development Guide
 
 ## Project Architecture

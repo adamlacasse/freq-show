@@ -1,20 +1,32 @@
 # FreqShow
 
+## About This Document
+
+This README provides human-oriented project overview and onboarding.
+Authoritative system behavior is defined in `/specs`.
+If there is a conflict, `/specs` wins.
+
 ![Freq Show logo](docs/img/freq-show_logo.png)
 
 **Deep cuts, no ads.** A music encyclopedia for listeners who still read liner notes.
 
-> **Current Status**: Fully functional music encyclopedia with artist search, rich artist biographies from Wikipedia, genre classification, chronologically sorted discographies, complete album pages with track listings, community reviews and ratings from Discogs, and seamless navigation. Features professional dark theme UI and intelligent data caching. [Try it live](#quick-start) by searching for artists like "Nirvana" or "Beatles" to explore their biographies, genres, discographies, and album reviews!
+> **Current Status**: Fully functional music encyclopedia with artist search, rich artist biographies from Wikipedia, genre classification, chronologically
+ sorted discographies, complete album pages with track listings,community reviews and ratings from Discogs,and seamless navigation. Features professional dark
+  theme UI and intelligent data caching. [Try it live](#quick-start) by searching for artists like "Nirvana" or "Beatles" to explore their biographies,
+  genres, discographies, and album reviews!
 
 ## What This Repo Contains
 
 - **Modern Monorepo**: Clean layout with application code under `apps/` and room for shared libraries in `packages/`.
-- **Go 1.22 Backend** (`apps/server`): High-performance API that integrates MusicBrainz metadata with Wikipedia biographies, intelligent genre classification, and comprehensive caching.
+- **Go 1.22 Backend** (`apps/server`): High-performance API that integrates MusicBrainz metadata with Wikipedia biographies,
+intelligent genre classification, and comprehensive caching.
 - **Multi-Source Data Integration**: MusicBrainz API for structured music data + Wikipedia API for artist biographies + Discogs API for community reviews and ratings.
 - **Album Reviews**: Community ratings and detailed release information from Discogs using OAuth authentication.
 - **Pluggable Architecture**: In-memory and SQLite persistence implementations with full dependency injection.
-- **Rich REST API**: `/healthz`, `/artists/{mbid}`, `/albums/{mbid}`, and `/search?q={query}` endpoints serving complete artist/album data with genres, biographies, track listings, and community reviews.
-- **Angular 17 Frontend** (`apps/frontend`): Professional UI with search, artist detail pages with biographies and genres, album detail pages, chronological discography sorting, and seamless navigation.
+- **Rich REST API**: `/healthz`, `/artists/{mbid}`, `/albums/{mbid}`, and `/search?q={query}` endpoints serving complete artist/album data with genres, biographies,
+track listings, and community reviews.
+- **Angular 17 Frontend** (`apps/frontend`): Professional UI with search, artist detail pages with biographies and genres, album detail pages, chronological discography
+sorting, and seamless navigation.
 - **Comprehensive Documentation**: Development log in `agent-context/development-log.md` capturing architectural decisions and evolution.
 
 ## Architecture at a Glance
@@ -22,7 +34,8 @@
 ### Backend (Go)
 
 - **`apps/server/cmd/server`** – Entry point; wires config, datastore, MusicBrainz + Wikipedia clients, HTTP router, and graceful shutdown.
-- **`apps/server/pkg/api`** – HTTP handlers using dependency-injected repositories and external API clients; handles caching logic, CORS, and multi-source data aggregation.
+- **`apps/server/pkg/api`** – HTTP handlers using dependency-injected repositories and external API clients; handles caching logic, CORS,
+and multi-source data aggregation.
 - **`apps/server/pkg/config`** – Environment-driven configuration supporting MusicBrainz, Wikipedia, database, and server settings.
 - **`apps/server/pkg/data`** – Rich domain structs with comprehensive artist metadata, album details, track information, and biography support.
 - **`apps/server/pkg/db`** – Repository interfaces plus memory/SQLite store implementations with JSON blob caching.
@@ -35,7 +48,8 @@
 - **`apps/frontend/src/app/models`** – Rich TypeScript interfaces for artists, albums, tracks, and search results.
 - **`apps/frontend/src/app/services`** – Reactive Angular services with RxJS state management and HTTP caching.
 - **`apps/frontend/src/app/components`** – Professional search component with debouncing and rich result cards.
-- **`apps/frontend/src/app/pages`** – Complete page components: home with search, artist detail with biographies/genres/sorted discographies, and album detail with full track listings.
+- **`apps/frontend/src/app/pages`** – Complete page components: home with search, artist detail with biographies/genres/sorted discographies,
+and album detail with full track listings.
 
 See `agent-context/development-log.md` for a chronological narrative of how these pieces evolved.
 
@@ -124,7 +138,8 @@ For backend-only development, you can configure environment variables (optional)
 - `REVIEWS_DISCOGS_CONSUMER_SECRET` – Your Discogs OAuth consumer secret (required for reviews)
 - `REVIEWS_DISCOGS_TOKEN` – Optional personal access token (alternative to OAuth)
 
-**Note**: The `.env` file already includes Discogs OAuth credentials for development. Reviews will be fetched automatically when you use the `run.sh` script. MusicBrainz requires a contact email and descriptive user agent—update the defaults if you deploy publicly.
+**Note**: The `.env` file already includes Discogs OAuth credentials for development. Reviews will be fetched automatically when you use the `run.sh` script.
+MusicBrainz requires a contact email and descriptive user agent—update the defaults if you deploy publicly.
 
 ## API Testing
 
@@ -143,7 +158,8 @@ You can test the backend endpoints directly:
  {
   "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
   "name": "Nirvana",
-  "biography": "Nirvana was an American rock band formed in Aberdeen, Washington, in 1987. Founded by lead singer and guitarist Kurt Cobain and bassist Krist Novoselic, the band went through a succession of drummers, most notably Dave Grohl, who joined in 1990.",
+  "biography": "Nirvana was an American rock band formed in Aberdeen, Washington, in 1987. Founded by lead singer and guitarist Kurt Cobain and bassist Krist Novoselic,
+  the band went through a succession of drummers, most notably Dave Grohl, who joined in 1990.",
   "genres": ["grunge", "alternative rock", "punk rock"],
   "albums": [
    {"id": "1b022e01-4da6-387b-8658-8678046e4cef", "title": "Nevermind", "year": 1991},

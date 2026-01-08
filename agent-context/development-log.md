@@ -1,4 +1,7 @@
-````markdown
+# Historical note: this log is narrative context only. Authoritative behavior lives in /specs (start at specs/index.md)
+
+# Use this for history, not requirements
+
 # 🎶 FreqShow Project Notes
 
 ## 1. Project Overview
@@ -6,6 +9,7 @@
 **FreqShow** is a web application designed as an **encyclopedic music information explorer** for serious music enthusiasts—especially Gen X listeners and collectors—who enjoy reading about artists, albums, genres, and reviews.  
 
 The idea was inspired by **AllMusic.com**, but FreqShow aims to be:
+
 - Faster and cleaner (less ad clutter)
 - Open and customizable
 - Built for discovery and critical appreciation, not social or user-generated noise
@@ -18,11 +22,13 @@ In short:
 ## 2. Design Goals and Philosophy
 
 ### 🎯 Target Audience
+
 - Music obsessives and collectors with broad tastes (rock, jazz, R&B, punk, electronic, etc.)
 - Users who value *critical* reviews and factual data (not crowdsourced chatter)
 - Often from Gen X or older millennial cohorts—people who remember CDs, vinyl, and music journalism.
 
 ### 🧭 Guiding Principles
+
 1. **“Research-first” experience:** FreqShow should feel like a hybrid between an encyclopedia and a record store conversation.
 2. **No ads or algorithmic junk:** Prioritize performance, readability, and depth.
 3. **Critically curated:** Prefer professional or aggregated critical reviews to user reviews.
@@ -30,11 +36,14 @@ In short:
 5. **Fun and whimsical, not pretentious:** Self-aware music nerdery with personality.
 
 ### 🧢 Name Origin
+
 **FreqShow** plays on the dual meanings of:
+
 - “Freq” = audio frequency (technical/musical angle)
 - “Freak show” = tongue-in-cheek nod to music obsessives
 
 Example taglines:
+
 - *FreqShow — for those who still read liner notes.*
 - *FreqShow — deep cuts, no ads.*
 - *FreqShow — a database for the musically obsessed.*
@@ -44,19 +53,23 @@ Example taglines:
 ## 3. Backend Plan (Go)
 
 ### 💡 Language Choice
+
 Backend implemented in **Go (Golang)** for its performance, simplicity, and native concurrency.
 Go is a strong fit for:
+
 - API servers
 - Concurrent web scraping or data aggregation tasks
 - Static typing and easy deployment
 
 ### ⚙️ Core Responsibilities
+
 - **Data aggregation layer:** Pull metadata and reviews from various APIs and public data sources.
 - **Normalization:** Standardize artist, album, and genre data structures.
 - **Storage:** Cache results in a local database (likely SQLite or Postgres).
 - **REST or GraphQL API:** Serve structured data to the Angular frontend.
 
 ### 🧩 Modules / Packages
+
 1. `freqshow/api` — REST handlers (artist, album, review endpoints)
 2. `freqshow/data` — models and schema definitions
 3. `freqshow/sources` — adapters for external APIs (MusicBrainz, Discogs, etc.)
@@ -64,6 +77,7 @@ Go is a strong fit for:
 5. `freqshow/db` — handles database connections, migrations, and caching
 
 ### 🔌 Current API Endpoints
+
 | Endpoint | Method | Description | Example |
 |----------|--------|-------------|---------|
 | `/healthz` | GET | Health check | `curl localhost:8080/healthz` |
@@ -72,6 +86,7 @@ Go is a strong fit for:
 | `/search?q={query}&limit={n}&offset={n}` | GET | Search artists | `curl "localhost:8080/search?q=beatles&limit=5"` |
 
 ### 🔌 Data Sources & APIs
+
 | Source | Status | Use | Implementation Notes |
 |--------|--------|-----|----------------------|
 | **MusicBrainz API** | ✅ **Active** | Artist, album, release metadata, genres/tags | Comprehensive client in `pkg/sources/musicbrainz` with tag filtering |
@@ -89,9 +104,11 @@ Go is a strong fit for:
 ## 4. Frontend Plan (Angular)
 
 ### 🧠 Motivation
+
 The developer (you) is experienced in React but switching to **Angular** professionally, so this project will double as a hands-on learning experience.
 
 ### 🏗️ Architecture
+
 - **Angular 17+**
 - **TypeScript**
 - **Tailwind CSS** for clean, consistent styling
@@ -100,6 +117,7 @@ The developer (you) is experienced in React but switching to **Angular** profess
 - Optional: **NgRx** for state management once the app grows
 
 ### 🧩 Core Components Status
+
 | Component | Status | Description |
 |------------|---------|-------------|
 | `SearchComponent` | ✅ **Built** | Debounced search with rich artist result cards |
@@ -114,6 +132,7 @@ The developer (you) is experienced in React but switching to **Angular** profess
 | `GenreExplorer` | 📋 *Planned* | Overview of genres and subgenres |
 
 ### 🖋️ Visual Style
+
 - Minimalist but warm; evoke a record-store feel
 - Subtle animation and polish using Framer Motion–style equivalents for Angular
 - Whimsical “freq show” flair — maybe waveform dividers or vinyl-inspired UI touches
@@ -174,6 +193,7 @@ type LifeSpan struct {
 ## 6. MVP Roadmap Status
 
 ### Phase 1: Data & API foundation ✅ **COMPLETE**
+
 - [x] Create Go project structure (`cmd/server`, `pkg/api`, `pkg/data`, etc.)
 - [x] Integrate MusicBrainz API for basic artist and album data + search
 - [x] Store fetched results locally (SQLite/in-memory)
@@ -184,6 +204,7 @@ type LifeSpan struct {
 - [x] Add logging, error handling, rate limiting, and CORS
 
 ### Phase 2: Angular client prototype ✅ **COMPLETE**
+
 - [x] Bootstrap Angular app with SSR and Tailwind
 - [x] Create functional search component with rich UI
 - [x] Connect to backend REST API with reactive services
@@ -196,6 +217,7 @@ type LifeSpan struct {
 - [x] Implement chronological discography sorting
 
 ### Phase 3: Content Enhancement ⚡ **IN PROGRESS**
+
 - [x] Wikipedia biography integration with smart fallback strategies
 - [x] MusicBrainz genre/tag classification and filtering
 - [x] Comprehensive track listing with duration formatting
@@ -205,6 +227,7 @@ type LifeSpan struct {
 - [ ] Review integration from open sources
 
 ### Phase 4: UX & Personality
+
 - [ ] Branding: logo, color palette, typography
 - [ ] Easter eggs / “deep cuts” mode for power users
 - [ ] Optional AI-generated summaries (trained on critic-style prose)
@@ -221,6 +244,7 @@ type LifeSpan struct {
 ---
 
 ## 8. Notes on AI and Metadata Ethics
+
 - Respect copyright and API terms of service
 - Prioritize open data sources (MusicBrainz, Wikidata)
 - Avoid scraping or republishing proprietary reviews without permission
@@ -260,8 +284,3 @@ A playful, respectful, developer-built revival of the encyclopedic music culture
 - **2025-10-31:** Implemented rich artist metadata enhancement: Added MusicBrainz tags integration with `inc=tags` parameter to fetch genre information, filtering out non-genre tags (nationalities, instruments, etc.) with smart classification. Created comprehensive Wikipedia API client (`pkg/sources/wikipedia`) with intelligent fallback search strategies (artist name, "band", "musician", "singer" variations), content cleaning (removing pronunciation guides, limiting to 3 sentences/500 chars), and proper error handling. Updated backend data transformation to populate genres from tags and biographies from Wikipedia. Enhanced artist detail page UI with professional genre display (color-coded primary/secondary genres, visual hierarchy), improved biography section with source attribution, and enhanced empty states. All data sources properly integrated with dependency injection and environment configuration.
 - **2025-10-31:** Added discography chronological sorting: Implemented `sortedAlbums` computed property in `ArtistDetailComponent` to sort albums by year in descending order (newest first) with alphabetical fallback for same-year releases. Enhanced discography UI with sorting indicator, prominent year badges on each album card, improved visual hierarchy emphasizing release years, and music-themed icons. Updated album card layout to better accommodate chronological browsing patterns. Users can now easily explore artist evolution from latest releases back to earliest work, matching standard music database navigation expectations.
 - **2025-10-31:** Implemented album reviews with Discogs API integration: Created comprehensive reviews client (`pkg/sources/reviews`) with OAuth consumer key/secret authentication for Discogs database API. Implemented multi-source review aggregation architecture with fallback pattern, Discogs search by artist/album with proper query formatting, release detail fetching with community ratings and release notes conversion. Extended configuration system with `ReviewsConfig` supporting both personal tokens and OAuth credentials via environment variables (`REVIEWS_DISCOGS_CONSUMER_KEY`, `REVIEWS_DISCOGS_CONSUMER_SECRET`). Integrated reviews into album lookup flow with graceful degradation—albums return successfully even if review fetching fails. Reviews include Discogs source attribution, community ratings (e.g., 4.7/5 from 1043 users), detailed release notes/liner information, and direct links to Discogs pages. Fixed OAuth authentication format (query parameters vs headers), corrected JSON unmarshaling for Discogs API responses, and implemented proper error handling. Created `run.sh` script to automatically load `.env` file with OAuth credentials for local development. Updated all documentation with reviews feature and proper startup instructions. All tests passing with reviews fully cached in SQLite alongside album data.
-
-````
-`````
-
-````

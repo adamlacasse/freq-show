@@ -12,7 +12,7 @@ func TestOpenAPISpecIsValid(t *testing.T) {
 	loader := openapi3.NewLoader()
 	loader.IsExternalRefsAllowed = true
 
-	specPath := filepath.Clean(filepath.Join("..", "..", "..", "..", "docs", "openapi.yaml"))
+	specPath := filepath.Clean(filepath.Join("..", "..", "..", "..", "specs", "openapi.yaml"))
 	doc, err := loader.LoadFromFile(specPath)
 	if err != nil {
 		t.Fatalf("failed to load OpenAPI spec at %s: %v", specPath, err)

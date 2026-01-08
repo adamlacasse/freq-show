@@ -9,6 +9,7 @@
  "ignores": [
    "node_modules/**",
    ".git/**",
-   ".venv/**"
+   ".venv/**",
+   "agent-context/**"
  ]
 }
