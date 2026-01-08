@@ -8,6 +8,7 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "openapi:gen": "openapi-typescript ../../docs/openapi.yaml -o src/app/models/openapi-types.generated.ts",
+    "openapi:check": "node scripts/openapi-check.mjs",
     "serve:ssr:frontend": "node dist/frontend/server/server.mjs"
   },
   "private": true,
