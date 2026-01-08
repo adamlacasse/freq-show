@@ -1,7 +1,9 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Album } from '../models/artist.models';
+import type { components } from '../models/openapi-types.generated';
+
+type Album = components['schemas']['Album'];
 
 @Injectable({
   providedIn: 'root'

@@ -389,6 +389,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Track'
+          nullable: true
         review:
           $ref: '#/components/schemas/Review'
         coverUrl:

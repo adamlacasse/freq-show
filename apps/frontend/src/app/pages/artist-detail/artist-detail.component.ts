@@ -3,7 +3,9 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subject, takeUntil, switchMap, EMPTY } from 'rxjs';
 import { ArtistService } from '../../services/artist.service';
-import { Artist } from '../../models/artist.models';
+import type { components } from '../../models/openapi-types.generated';
+
+type Artist = components['schemas']['Artist'];
 
 @Component({
   selector: 'app-artist-detail',

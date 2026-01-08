@@ -4,7 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject, takeUntil, debounceTime, distinctUntilChanged } from 'rxjs';
 import { SearchService } from '../../services/search.service';
-import { SearchResult, Artist } from '../../models/search.models';
+import type { components } from '../../models/openapi-types.generated';
+
+type SearchResult = components['schemas']['SearchResult'];
+type Artist = components['schemas']['SearchArtist'];
 
 @Component({
   selector: 'app-search',
@@ -56,7 +59,7 @@ export class SearchComponent implements OnDestroy {
   performSearch(query: string): void {
     this.isSearching = true;
     this.searchService.searchArtists({
-      query,
+      q: query,
       limit: 10
     }).subscribe({
       next: () => {

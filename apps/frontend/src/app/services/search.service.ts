@@ -1,7 +1,10 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, BehaviorSubject } from 'rxjs';
-import { SearchResult, SearchParams } from '../models/search.models';
+import type { components, operations } from '../models/openapi-types.generated';
+
+type SearchResult = components['schemas']['SearchResult'];
+type SearchArtistsQuery = operations['searchArtists']['parameters']['query'];
 
 @Injectable({
   providedIn: 'root'
@@ -15,11 +18,11 @@ export class SearchService {
 
   constructor(private http: HttpClient) {}
 
-  searchArtists(params: SearchParams): Observable<SearchResult> {
+  searchArtists(params: SearchArtistsQuery): Observable<SearchResult> {
     this.isSearching = true;
     
     let httpParams = new HttpParams()
-      .set('q', params.query);
+      .set('q', params.q);
     
     if (params.limit) {
       httpParams = httpParams.set('limit', params.limit.toString());

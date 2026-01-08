@@ -3,7 +3,9 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subject, takeUntil, switchMap, EMPTY } from 'rxjs';
 import { AlbumService } from '../../services/album.service';
-import { Album } from '../../models/artist.models';
+import type { components } from '../../models/openapi-types.generated';
+
+type Album = components['schemas']['Album'];
 
 @Component({
   selector: 'app-album-detail',
