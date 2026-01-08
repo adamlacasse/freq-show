@@ -77,7 +77,7 @@ func artistLookupHandler(repo db.ArtistRepository, mbClient MusicBrainzClient, w
 			return
 		}
 
-		writeJSON(w, http.StatusOK, artist)
+		writeJSON(w, http.StatusOK, normalizeArtistForJSON(artist))
 	})
 }
 
@@ -99,7 +99,7 @@ func albumLookupHandler(repo db.AlbumRepository, client MusicBrainzClient, revie
 			return
 		}
 
-		writeJSON(w, http.StatusOK, album)
+		writeJSON(w, http.StatusOK, normalizeAlbumForJSON(album))
 	})
 }
 
@@ -396,8 +396,69 @@ func searchHandler(client MusicBrainzClient) http.HandlerFunc {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, result)
+		writeJSON(w, http.StatusOK, normalizeSearchResultForJSON(result))
 	}
+}
+
+func normalizeArtistForJSON(artist *data.Artist) *data.Artist {
+	if artist == nil {
+		return nil
+	}
+
+	if artist.Genres == nil {
+		artist.Genres = []string{}
+	}
+	if artist.Albums == nil {
+		artist.Albums = []data.Album{}
+	}
+	if artist.Related == nil {
+		artist.Related = []string{}
+	}
+	if artist.Aliases == nil {
+		artist.Aliases = []string{}
+	}
+
+	for i := range artist.Albums {
+		normalizeAlbumFields(&artist.Albums[i])
+	}
+
+	return artist
+}
+
+func normalizeAlbumForJSON(album *data.Album) *data.Album {
+	if album == nil {
+		return nil
+	}
+
+	normalizeAlbumFields(album)
+	return album
+}
+
+func normalizeAlbumFields(album *data.Album) {
+	if album.SecondaryTypes == nil {
+		album.SecondaryTypes = []string{}
+	}
+	if album.Tracks == nil {
+		album.Tracks = []data.Track{}
+	}
+}
+
+func normalizeSearchResultForJSON(result *musicbrainz.SearchResult) *musicbrainz.SearchResult {
+	if result == nil {
+		return nil
+	}
+
+	if result.Artists == nil {
+		result.Artists = []musicbrainz.Artist{}
+	}
+
+	for i := range result.Artists {
+		if result.Artists[i].Aliases == nil {
+			result.Artists[i].Aliases = []string{}
+		}
+	}
+
+	return result
 }
 
 func parseSearchLimit(limitStr string) int {

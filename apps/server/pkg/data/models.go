@@ -11,7 +11,7 @@ type Artist struct {
 	Country        string   `json:"country,omitempty"`
 	Type           string   `json:"type,omitempty"`
 	Disambiguation string   `json:"disambiguation,omitempty"`
-	Aliases        []string `json:"aliases,omitempty"`
+	Aliases        []string `json:"aliases"`
 	LifeSpan       LifeSpan `json:"lifeSpan"`
 }
 
@@ -27,7 +27,7 @@ type Album struct {
 	ArtistID         string   `json:"artistId"`
 	ArtistName       string   `json:"artistName,omitempty"`
 	PrimaryType      string   `json:"primaryType,omitempty"`
-	SecondaryTypes   []string `json:"secondaryTypes,omitempty"`
+	SecondaryTypes   []string `json:"secondaryTypes"`
 	FirstReleaseDate string   `json:"firstReleaseDate,omitempty"`
 	Year             int      `json:"year"`
 	Genre            string   `json:"genre"`

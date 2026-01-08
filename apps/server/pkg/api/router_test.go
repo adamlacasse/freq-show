@@ -308,6 +308,58 @@ func TestArtistLookupHandlerMusicBrainzError(t *testing.T) {
 	}
 }
 
+func TestArtistLookupHandlerNormalizesEmptySlices(t *testing.T) {
+	repo := &stubArtistRepo{
+		getFunc: func(ctx context.Context, id string) (*data.Artist, error) {
+			return &data.Artist{
+				ID:      id,
+				Name:    "Artist",
+				Genres:  nil,
+				Albums:  []data.Album{{ID: "album-1", Title: "Album 1", Tracks: nil, SecondaryTypes: nil}},
+				Related: nil,
+				Aliases: nil,
+				LifeSpan: data.LifeSpan{
+					Begin: "",
+				},
+			}, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, artistPath, nil)
+	res := httptest.NewRecorder()
+
+	artistLookupHandler(repo, &stubMusicBrainz{}, &stubWikipedia{}).ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf(status200Fmt, res.Code)
+	}
+
+	var payload data.Artist
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf(decodeErrFmt, err)
+	}
+
+	if payload.Genres == nil || len(payload.Genres) != 0 {
+		t.Fatalf("expected genres to be an empty slice")
+	}
+	if payload.Related == nil || len(payload.Related) != 0 {
+		t.Fatalf("expected related to be an empty slice")
+	}
+	if payload.Aliases == nil || len(payload.Aliases) != 0 {
+		t.Fatalf("expected aliases to be an empty slice")
+	}
+	if payload.Albums == nil || len(payload.Albums) != 1 {
+		t.Fatalf("expected a single album in response")
+	}
+	album := payload.Albums[0]
+	if album.SecondaryTypes == nil || len(album.SecondaryTypes) != 0 {
+		t.Fatalf("expected album secondaryTypes to be an empty slice")
+	}
+	if album.Tracks == nil || len(album.Tracks) != 0 {
+		t.Fatalf("expected album tracks to be an empty slice")
+	}
+}
+
 func TestAlbumLookupHandlerReturnsCachedAlbum(t *testing.T) {
 	repo := &stubAlbumRepo{
 		getFunc: func(ctx context.Context, id string) (*data.Album, error) {
@@ -481,6 +533,70 @@ func TestSearchHandlerReturnsResults(t *testing.T) {
 	}
 }
 
+func TestAlbumLookupHandlerNormalizesEmptySlices(t *testing.T) {
+	repo := &stubAlbumRepo{
+		getFunc: func(ctx context.Context, id string) (*data.Album, error) {
+			return &data.Album{
+				ID:             id,
+				Title:          "Album",
+				SecondaryTypes: nil,
+				Tracks:         nil,
+			}, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, albumPath, nil)
+	res := httptest.NewRecorder()
+
+	albumLookupHandler(repo, &stubMusicBrainz{}, &stubReviews{}).ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf(status200Fmt, res.Code)
+	}
+
+	var payload data.Album
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf(decodeErrFmt, err)
+	}
+
+	if payload.SecondaryTypes == nil || len(payload.SecondaryTypes) != 0 {
+		t.Fatalf("expected secondaryTypes to be an empty slice")
+	}
+	if payload.Tracks == nil || len(payload.Tracks) != 0 {
+		t.Fatalf("expected tracks to be an empty slice")
+	}
+}
+
+func TestAlbumLookupHandlerKeepsTracksWhenPopulated(t *testing.T) {
+	repo := &stubAlbumRepo{}
+	mb := &stubMusicBrainz{
+		lookupReleaseGroupFunc: func(ctx context.Context, id string) (*musicbrainz.ReleaseGroup, error) {
+			return &musicbrainz.ReleaseGroup{ID: id, Title: "Album", PrimaryType: "Album", ArtistCredit: []musicbrainz.ArtistCredit{}}, nil
+		},
+		getReleaseGroupTracksFunc: func(ctx context.Context, releaseGroupID string) ([]musicbrainz.Track, error) {
+			return []musicbrainz.Track{{Number: 1, Title: "Track 1", Length: "3:00"}}, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, albumPath, nil)
+	res := httptest.NewRecorder()
+
+	albumLookupHandler(repo, mb, &stubReviews{}).ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf(status200Fmt, res.Code)
+	}
+
+	var payload data.Album
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf(decodeErrFmt, err)
+	}
+
+	if len(payload.Tracks) != 1 {
+		t.Fatalf("expected one track in response")
+	}
+}
+
 func TestSearchHandlerRequiresQuery(t *testing.T) {
 	mb := &stubMusicBrainz{}
 	handler := searchHandler(mb)
@@ -490,5 +606,39 @@ func TestSearchHandlerRequiresQuery(t *testing.T) {
 
 	if resp.Code != http.StatusBadRequest {
 		t.Fatalf(status400Fmt, resp.Code)
+	}
+}
+
+func TestSearchHandlerNormalizesAliases(t *testing.T) {
+	mb := &stubMusicBrainz{
+		searchArtistsFunc: func(ctx context.Context, query string, limit int, offset int) (*musicbrainz.SearchResult, error) {
+			return &musicbrainz.SearchResult{
+				Artists: []musicbrainz.Artist{{ID: "artist1", Name: "Artist", Aliases: nil}},
+				Offset:  0,
+				Count:   1,
+			}, nil
+		},
+	}
+
+	handler := searchHandler(mb)
+	req := httptest.NewRequest(http.MethodGet, "/search?q=artist", nil)
+	resp := httptest.NewRecorder()
+
+	handler.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf(status200Fmt, resp.Code)
+	}
+
+	var result musicbrainz.SearchResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf(decodeErrFmt, err)
+	}
+
+	if result.Artists == nil || len(result.Artists) != 1 {
+		t.Fatalf("expected one artist in search results")
+	}
+	if result.Artists[0].Aliases == nil || len(result.Artists[0].Aliases) != 0 {
+		t.Fatalf("expected aliases to be an empty slice")
 	}
 }

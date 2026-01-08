@@ -88,7 +88,7 @@ type Artist struct {
 	Country        string   `json:"country,omitempty"`
 	Type           string   `json:"type,omitempty"`
 	Disambiguation string   `json:"disambiguation,omitempty"`
-	Aliases        []string `json:"aliases,omitempty"`
+	Aliases        []string `json:"aliases"`
 	Tags           []string `json:"tags,omitempty"`
 	LifeSpan       LifeSpan `json:"lifeSpan"`
 }
