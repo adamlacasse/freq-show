@@ -94,21 +94,21 @@ export interface components {
             country?: string | null;
             type?: string | null;
             disambiguation?: string | null;
-            aliases?: string[] | null;
+            aliases?: string[];
             lifeSpan: components["schemas"]["LifeSpan"];
         };
         Artist: {
             id: string;
             name: string;
             biography: string;
-            genres: string[] | null;
-            albums: components["schemas"]["Album"][] | null;
-            related: string[] | null;
+            genres: string[];
+            albums: components["schemas"]["Album"][];
+            related: string[];
             imageUrl: string;
             country?: string | null;
             type?: string | null;
             disambiguation?: string | null;
-            aliases?: string[] | null;
+            aliases?: string[];
             lifeSpan: components["schemas"]["LifeSpan"];
         };
         LifeSpan: {
@@ -122,13 +122,13 @@ export interface components {
             artistId: string;
             artistName?: string | null;
             primaryType?: string | null;
-            secondaryTypes?: string[] | null;
+            secondaryTypes?: string[];
             firstReleaseDate?: string | null;
             /** @description Release year extracted from firstReleaseDate when available */
             year: number;
             genre: string;
             label: string;
-            tracks: components["schemas"]["Track"][] | null;
+            tracks: components["schemas"]["Track"][];
             review: components["schemas"]["Review"];
             coverUrl: string;
         };

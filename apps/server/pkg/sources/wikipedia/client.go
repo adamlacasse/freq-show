@@ -81,7 +81,12 @@ func (c *Client) GetArtistBiography(ctx context.Context, artistName string) (str
 	// First, try to get the page summary directly
 	summary, err := c.getPageSummary(ctx, artistName)
 	if err == nil && summary.Extract != "" {
-		return c.cleanExtract(summary.Extract), nil
+		if c.isLikelyArtistSummary(artistName, summary) {
+			return c.cleanExtract(summary.Extract), nil
+		}
+		// The title exists, but it doesn't look like an artist biography (e.g. abstract concepts).
+		// Treat this as a miss so we can try better-targeted titles like "(band)".
+		err = ErrNotFound
 	}
 
 	// If direct lookup fails, try with "band" suffix for groups
@@ -114,8 +119,81 @@ func (c *Client) GetArtistBiography(ctx context.Context, artistName string) (str
 	return "", ErrNotFound
 }
 
+func (c *Client) isLikelyArtistSummary(artistName string, summary *Summary) bool {
+	if summary == nil {
+		return false
+	}
+	extract := strings.TrimSpace(summary.Extract)
+	if extract == "" {
+		return false
+	}
+
+	firstSentence := extract
+	if idx := strings.Index(firstSentence, ". "); idx != -1 {
+		firstSentence = firstSentence[:idx]
+	}
+	firstSentenceLower := strings.ToLower(firstSentence)
+
+	// Positive indicators: common Wikipedia lead patterns for musicians/bands.
+	positive := []string{
+		" band",
+		" rock band",
+		" pop band",
+		" hip hop",
+		" musician",
+		" singer",
+		" rapper",
+		" songwriter",
+		" composer",
+		" record producer",
+		" dj",
+		" group",
+		" duo",
+		" trio",
+		" vocalist",
+		" guitarist",
+		" drummer",
+		" bassist",
+		" pianist",
+		" orchestra",
+	}
+	for _, p := range positive {
+		if strings.Contains(firstSentenceLower, p) {
+			return true
+		}
+	}
+
+	// Negative indicators: common false-positive pages when the artist name collides with concepts.
+	// We only reject if *none* of the positive indicators are present.
+	negative := []string{
+		" concept",
+		" religious",
+		" religion",
+		" buddh",
+		" hindu",
+		" philosophy",
+		" spiritual",
+		" enlightenment",
+		" liberation",
+		" meditation",
+		" state of",
+	}
+	for _, n := range negative {
+		if strings.Contains(firstSentenceLower, n) {
+			return false
+		}
+	}
+
+	// If we can't find a clear signal either way, accept the summary rather than dropping biographies.
+	_ = artistName
+	return true
+}
+
 func (c *Client) getPageSummary(ctx context.Context, title string) (*Summary, error) {
 	encodedTitle := url.PathEscape(title)
+	// Wikipedia REST endpoints keep parentheses unescaped (e.g. "Nirvana (band)")
+	encodedTitle = strings.ReplaceAll(encodedTitle, "%28", "(")
+	encodedTitle = strings.ReplaceAll(encodedTitle, "%29", ")")
 	endpoint := fmt.Sprintf("%s/page/summary/%s", c.baseURL, encodedTitle)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)

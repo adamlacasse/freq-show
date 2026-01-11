@@ -45,8 +45,10 @@ and multi-source data aggregation.
 
 ### Frontend (Angular + Tailwind)
 
+- **`apps/frontend/server.ts`** – Express SSR server with API proxy middleware that forwards `/api/*` requests to Go backend
+(eliminates CORS, supports production deployment).
 - **`apps/frontend/src/app/models`** – Rich TypeScript interfaces for artists, albums, tracks, and search results.
-- **`apps/frontend/src/app/services`** – Reactive Angular services with RxJS state management and HTTP caching.
+- **`apps/frontend/src/app/services`** – Reactive Angular services with RxJS state management, HTTP caching, and relative `/api/*` paths.
 - **`apps/frontend/src/app/components`** – Professional search component with debouncing and rich result cards.
 - **`apps/frontend/src/app/pages`** – Complete page components: home with search, artist detail with biographies/genres/sorted discographies,
 and album detail with full track listings.
@@ -95,6 +97,7 @@ To run both the backend API and frontend simultaneously:
  npm install
  npm start
  # Frontend runs on http://localhost:4200
+ # Angular SSR proxies /api/* requests to backend
  ```
 
 1. **Try It Out**
@@ -146,10 +149,15 @@ MusicBrainz requires a contact email and descriptive user agent—update the def
 You can test the backend endpoints directly:
 
  ```bash
+ # Direct backend access (development):
  curl http://localhost:8080/healthz
  curl http://localhost:8080/artists/5b11f4ce-a62d-471e-81fc-a69a8278c7da   # Nirvana with biography, genres, full discography
  curl http://localhost:8080/albums/1b022e01-4da6-387b-8658-8678046e4cef   # Nevermind with all 12 tracks
  curl "http://localhost:8080/search?q=beatles&limit=5"                     # Search artists with rich metadata
+ 
+ # Via frontend proxy (matches production):
+ curl http://localhost:4200/api/healthz
+ curl http://localhost:4200/api/artists/5b11f4ce-a62d-471e-81fc-a69a8278c7da
  ```
 
  **Sample Response** (artist with biography and genres):
@@ -186,9 +194,10 @@ npm start
 
 ## Development Notes
 
+- **Proxy Architecture**: Frontend SSR server proxies `/api/*` to Go backend, stripping the `/api` prefix. Configure via `API_BASE_URL` env var (defaults to `http://localhost:8080`).
 - **Caching Strategy**: First request fetches from MusicBrainz; subsequent requests return cached payload from SQLite.
 - **Database**: SQLite stores JSON blobs—use `jq` or SQL queries to inspect: `sqlite3 apps/server/freqshow.db ".tables"`
-- **CORS**: Enabled for `http://localhost:4200` in development mode.
+- **CORS**: Enabled for `http://localhost:4200` in development mode (not needed in production due to proxy).
 - **Search Performance**: MusicBrainz search API is rate-limited; results are not currently cached (future enhancement).
 - **Documentation**: `agent-context/development-log.md` contains detailed development history and architectural decisions.
 

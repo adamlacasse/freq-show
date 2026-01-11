@@ -4,6 +4,7 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import bootstrap from './src/main.server';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 // The Express app is exported so that it can be used by serverless Functions.
 export function app(): express.Express {
@@ -14,15 +15,29 @@ export function app(): express.Express {
 
   const commonEngine = new CommonEngine();
 
+  server.set('trust proxy', 1);
   server.set('view engine', 'html');
   server.set('views', browserDistFolder);
 
-  // Example Express Rest API endpoints
-  // server.get('/api/**', (req, res) => { });
+  // ---- API proxy ----
+  const apiTarget = process.env['API_BASE_URL'] || 'http://localhost:8080';
+
+  server.use(
+    '/api',
+    createProxyMiddleware({
+      target: apiTarget,
+      changeOrigin: true,
+      pathRewrite: { '^/api': '' },
+    })
+  );
+
   // Serve static files from /browser
-  server.get('*.*', express.static(browserDistFolder, {
-    maxAge: '1y'
-  }));
+  server.get(
+    '*.*',
+    express.static(browserDistFolder, {
+      maxAge: '1y',
+    })
+  );
 
   // All regular routes use the Angular engine
   server.get('*', (req, res, next) => {

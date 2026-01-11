@@ -10,7 +10,7 @@ type SearchArtistsQuery = operations['searchArtists']['parameters']['query'];
   providedIn: 'root'
 })
 export class SearchService {
-  private apiUrl = 'http://localhost:8080';
+  private apiUrl = '/api';
   private searchResultsSubject = new BehaviorSubject<SearchResult | null>(null);
   
   public searchResults$ = this.searchResultsSubject.asObservable();

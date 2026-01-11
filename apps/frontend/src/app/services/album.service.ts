@@ -9,7 +9,7 @@ type Album = components['schemas']['Album'];
   providedIn: 'root'
 })
 export class AlbumService {
-  private apiUrl = 'http://localhost:8080';
+  private apiUrl = '/api';
 
   constructor(private http: HttpClient) {}
 

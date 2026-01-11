@@ -9,7 +9,7 @@ type Artist = components['schemas']['Artist'];
   providedIn: 'root'
 })
 export class ArtistService {
-  private apiUrl = 'http://localhost:8080';
+  private apiUrl = '/api';
 
   constructor(private http: HttpClient) {}
 
