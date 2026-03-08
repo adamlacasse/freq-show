@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, BehaviorSubject } from 'rxjs';
+import { Observable, BehaviorSubject, shareReplay } from 'rxjs';
 import type { components, operations } from '../models/openapi-types.generated';
 
 type SearchResult = components['schemas']['SearchResult'];
@@ -32,7 +32,9 @@ export class SearchService {
       httpParams = httpParams.set('offset', params.offset.toString());
     }
 
-    const searchObservable = this.http.get<SearchResult>(`${this.apiUrl}/search`, { params: httpParams });
+    const searchObservable = this.http.get<SearchResult>(`${this.apiUrl}/search`, { params: httpParams }).pipe(
+      shareReplay(1)
+    );
     
     searchObservable.subscribe({
       next: (result) => {
