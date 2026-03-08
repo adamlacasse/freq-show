@@ -5,11 +5,10 @@ import { SearchComponent } from '../../components/search/search.component';
 type RoadmapStatus = 'done' | 'in-progress' | 'up-next';
 
 @Component({
-  selector: 'app-home',
-  standalone: true,
-  imports: [CommonModule, SearchComponent],
-  templateUrl: './home.component.html',
-  styleUrl: './home.component.css'
+    selector: 'app-home',
+    imports: [CommonModule, SearchComponent],
+    templateUrl: './home.component.html',
+    styleUrl: './home.component.css'
 })
 export class HomeComponent {
   readonly hero = {
