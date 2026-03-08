@@ -8,11 +8,10 @@ import type { components } from '../../models/openapi-types.generated';
 type Artist = components['schemas']['Artist'];
 
 @Component({
-  selector: 'app-artist-detail',
-  standalone: true,
-  imports: [CommonModule, RouterLink],
-  templateUrl: './artist-detail.component.html',
-  styleUrl: './artist-detail.component.css'
+    selector: 'app-artist-detail',
+    imports: [CommonModule, RouterLink],
+    templateUrl: './artist-detail.component.html',
+    styleUrl: './artist-detail.component.css'
 })
 export class ArtistDetailComponent implements OnInit, OnDestroy {
   artist: Artist | null = null;

@@ -8,11 +8,10 @@ import type { components } from '../../models/openapi-types.generated';
 type Album = components['schemas']['Album'];
 
 @Component({
-  selector: 'app-album-detail',
-  standalone: true,
-  imports: [CommonModule, RouterLink],
-  templateUrl: './album-detail.component.html',
-  styleUrl: './album-detail.component.css'
+    selector: 'app-album-detail',
+    imports: [CommonModule, RouterLink],
+    templateUrl: './album-detail.component.html',
+    styleUrl: './album-detail.component.css'
 })
 export class AlbumDetailComponent implements OnInit, OnDestroy {
   album: Album | null = null;

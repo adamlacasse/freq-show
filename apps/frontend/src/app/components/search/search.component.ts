@@ -10,11 +10,10 @@ type SearchResult = components['schemas']['SearchResult'];
 type Artist = components['schemas']['SearchArtist'];
 
 @Component({
-  selector: 'app-search',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  templateUrl: './search.component.html',
-  styleUrls: ['./search.component.css']
+    selector: 'app-search',
+    imports: [CommonModule, FormsModule],
+    templateUrl: './search.component.html',
+    styleUrls: ['./search.component.css']
 })
 export class SearchComponent implements OnDestroy {
   searchQuery = '';
