@@ -33,7 +33,7 @@ export class SearchService {
     }
 
     const searchObservable = this.http.get<SearchResult>(`${this.apiUrl}/search`, { params: httpParams }).pipe(
-      shareReplay(1)
+      shareReplay({ bufferSize: 1, refCount: true })
     );
     
     searchObservable.subscribe({
