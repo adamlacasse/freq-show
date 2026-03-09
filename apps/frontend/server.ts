@@ -13,7 +13,14 @@ export function app(): express.Express {
   const browserDistFolder = resolve(serverDistFolder, '../browser');
   const indexHtml = join(serverDistFolder, 'index.server.html');
 
-  const commonEngine = new CommonEngine();
+  const commonEngine = new CommonEngine({
+    allowedHosts: [
+      'localhost',
+      'localhost:4000',
+      'freq-show.adamlacasse.dev',
+      'freq-show-frontend.onrender.com',
+    ],
+  });
 
   server.set('trust proxy', 1);
   server.set('view engine', 'html');
