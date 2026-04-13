@@ -81,7 +81,7 @@ func (s *stubMusicBrainz) GetArtistReleaseGroups(ctx context.Context, artistID s
 	if s.getArtistReleaseGroupsFunc != nil {
 		return s.getArtistReleaseGroupsFunc(ctx, artistID, limit, offset)
 	}
-	return nil, errors.New(unexpectedCall)
+	return &musicbrainz.ReleaseGroupSearchResult{}, nil
 }
 
 func (s *stubMusicBrainz) GetReleaseGroupTracks(ctx context.Context, releaseGroupID string) ([]musicbrainz.Track, error) {
@@ -92,14 +92,14 @@ func (s *stubMusicBrainz) GetReleaseGroupTracks(ctx context.Context, releaseGrou
 }
 
 type stubWikipedia struct {
-	getArtistBiographyFunc func(ctx context.Context, artistName string) (string, error)
+	getArtistBiographyFunc func(ctx context.Context, artistName string) (string, string, error)
 }
 
-func (s *stubWikipedia) GetArtistBiography(ctx context.Context, artistName string) (string, error) {
+func (s *stubWikipedia) GetArtistBiography(ctx context.Context, artistName string) (string, string, error) {
 	if s.getArtistBiographyFunc != nil {
 		return s.getArtistBiographyFunc(ctx, artistName)
 	}
-	return "", errors.New(unexpectedCall)
+	return "", "", errors.New(unexpectedCall)
 }
 
 type stubReviews struct {
@@ -133,7 +133,14 @@ func (s *stubAlbumRepo) SaveAlbum(ctx context.Context, album *data.Album) error 
 }
 
 func TestArtistLookupHandlerReturnsCachedArtist(t *testing.T) {
-	cached := &data.Artist{ID: testArtistID, Name: "Cached"}
+	cached := &data.Artist{
+		ID:           testArtistID,
+		Name:         "Cached",
+		Biography:    "Cached biography",
+		BiographyURL: "https://en.wikipedia.org/wiki/Cached",
+		Related:      []data.RelatedArtist{{ID: "related-1", Name: "Related Artist"}},
+		Albums:       []data.Album{{ID: "album-1", Title: "Cached Album"}},
+	}
 
 	repo := &stubArtistRepo{
 		getFunc: func(ctx context.Context, id string) (*data.Artist, error) {
@@ -150,8 +157,10 @@ func TestArtistLookupHandlerReturnsCachedArtist(t *testing.T) {
 
 	mb := &stubMusicBrainz{
 		lookupArtistFunc: func(ctx context.Context, id string) (*musicbrainz.Artist, error) {
-			t.Fatalf("musicbrainz should not be called on cache hit")
-			return nil, nil
+			if id != testArtistID {
+				t.Fatalf("unexpected id %q", id)
+			}
+			return &musicbrainz.Artist{ID: id, Name: "Cached"}, nil
 		},
 	}
 
@@ -211,6 +220,74 @@ func TestArtistLookupHandlerFetchesAndCaches(t *testing.T) {
 	}
 	if !saved {
 		t.Fatalf("expected artist to be cached")
+	}
+}
+
+func TestArtistLookupHandlerIncludesWikipediaSourceAndRelatedArtists(t *testing.T) {
+	repo := &stubArtistRepo{
+		getFunc: func(ctx context.Context, id string) (*data.Artist, error) {
+			return nil, nil
+		},
+	}
+
+	mb := &stubMusicBrainz{
+		lookupArtistFunc: func(ctx context.Context, id string) (*musicbrainz.Artist, error) {
+			return &musicbrainz.Artist{
+				ID:   id,
+				Name: "Remote Artist",
+				Relations: []musicbrainz.ArtistRelation{
+					{
+						Type:       "member of band",
+						TargetType: "artist",
+						Artist:     musicbrainz.RelationArtist{ID: "related-1", Name: "Related Artist 1"},
+					},
+					{
+						Type:       "founder of",
+						TargetType: "artist",
+						Artist:     musicbrainz.RelationArtist{ID: "related-2", Name: "Related Artist 2"},
+					},
+				},
+			}, nil
+		},
+		getArtistReleaseGroupsFunc: func(ctx context.Context, artistID string, limit int, offset int) (*musicbrainz.ReleaseGroupSearchResult, error) {
+			return &musicbrainz.ReleaseGroupSearchResult{}, nil
+		},
+	}
+
+	wiki := &stubWikipedia{
+		getArtistBiographyFunc: func(ctx context.Context, artistName string) (string, string, error) {
+			if artistName != "Remote Artist" {
+				t.Fatalf("unexpected artist name %q", artistName)
+			}
+			return "Biography text", "https://en.wikipedia.org/wiki/Remote_Artist", nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, artistPath, nil)
+	res := httptest.NewRecorder()
+
+	artistLookupHandler(repo, mb, wiki).ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf(status200Fmt, res.Code)
+	}
+
+	var payload data.Artist
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf(decodeErrFmt, err)
+	}
+
+	if payload.BiographyURL != "https://en.wikipedia.org/wiki/Remote_Artist" {
+		t.Fatalf("expected wikipedia source url, got %q", payload.BiographyURL)
+	}
+	if len(payload.Related) != 2 {
+		t.Fatalf("expected 2 related artists, got %d", len(payload.Related))
+	}
+	if payload.Related[0].ID != "related-1" || payload.Related[0].Name != "Related Artist 1" {
+		t.Fatalf("unexpected first related artist: %#v", payload.Related[0])
+	}
+	if payload.Related[0].RelationshipType != "member of band" {
+		t.Fatalf("unexpected first related artist relationship type: %#v", payload.Related[0])
 	}
 }
 
@@ -347,6 +424,9 @@ func TestArtistLookupHandlerNormalizesEmptySlices(t *testing.T) {
 	}
 	if payload.Aliases == nil || len(payload.Aliases) != 0 {
 		t.Fatalf("expected aliases to be an empty slice")
+	}
+	if payload.BiographyURL != "" {
+		t.Fatalf("expected biographyUrl to be empty by default")
 	}
 	if payload.Albums == nil || len(payload.Albums) != 1 {
 		t.Fatalf("expected a single album in response")

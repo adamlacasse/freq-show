@@ -303,6 +303,9 @@ components:
           type: string
         biography:
           type: string
+        biographyUrl:
+          type: string
+          description: Canonical Wikipedia page URL when the biography was sourced from Wikipedia.
         genres:
           type: array
           items:
@@ -314,7 +317,7 @@ components:
         related:
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/RelatedArtist'
         imageUrl:
           type: string
         country:
@@ -332,6 +335,19 @@ components:
             type: string
         lifeSpan:
           $ref: '#/components/schemas/LifeSpan'
+
+    RelatedArtist:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        relationshipType:
+          type: string
+          description: MusicBrainz relation type connecting this artist to the current artist.
 
     LifeSpan:
       type: object

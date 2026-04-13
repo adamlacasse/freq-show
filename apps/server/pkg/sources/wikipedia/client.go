@@ -59,9 +59,10 @@ func New(_ context.Context, cfg Config) (*Client, error) {
 
 // Summary represents a Wikipedia page summary.
 type Summary struct {
-	Title   string `json:"title"`
-	Extract string `json:"extract"`
-	Type    string `json:"type"`
+	Title     string `json:"title"`
+	Extract   string `json:"extract"`
+	Type      string `json:"type"`
+	SourceURL string
 }
 
 type summaryResponse struct {
@@ -70,19 +71,24 @@ type summaryResponse struct {
 	Displaytitle string `json:"displaytitle"`
 	Extract      string `json:"extract"`
 	ExtractHTML  string `json:"extract_html"`
+	ContentURLs  struct {
+		Desktop struct {
+			Page string `json:"page"`
+		} `json:"desktop"`
+	} `json:"content_urls"`
 }
 
 // GetArtistBiography attempts to fetch a biography for an artist by searching Wikipedia.
-func (c *Client) GetArtistBiography(ctx context.Context, artistName string) (string, error) {
+func (c *Client) GetArtistBiography(ctx context.Context, artistName string) (string, string, error) {
 	if strings.TrimSpace(artistName) == "" {
-		return "", errors.New("wikipedia: artist name is required")
+		return "", "", errors.New("wikipedia: artist name is required")
 	}
 
 	// First, try to get the page summary directly
 	summary, err := c.getPageSummary(ctx, artistName)
 	if err == nil && summary.Extract != "" {
 		if c.isLikelyArtistSummary(artistName, summary) {
-			return c.cleanExtract(summary.Extract), nil
+			return c.cleanExtract(summary.Extract), summary.SourceURL, nil
 		}
 		// The title exists, but it doesn't look like an artist biography (e.g. abstract concepts).
 		// Treat this as a miss so we can try better-targeted titles like "(band)".
@@ -94,7 +100,7 @@ func (c *Client) GetArtistBiography(ctx context.Context, artistName string) (str
 		bandName := artistName + " (band)"
 		summary, err = c.getPageSummary(ctx, bandName)
 		if err == nil && summary.Extract != "" {
-			return c.cleanExtract(summary.Extract), nil
+			return c.cleanExtract(summary.Extract), summary.SourceURL, nil
 		}
 	}
 
@@ -103,7 +109,7 @@ func (c *Client) GetArtistBiography(ctx context.Context, artistName string) (str
 		musicianName := artistName + " (musician)"
 		summary, err = c.getPageSummary(ctx, musicianName)
 		if err == nil && summary.Extract != "" {
-			return c.cleanExtract(summary.Extract), nil
+			return c.cleanExtract(summary.Extract), summary.SourceURL, nil
 		}
 	}
 
@@ -112,11 +118,11 @@ func (c *Client) GetArtistBiography(ctx context.Context, artistName string) (str
 		singerName := artistName + " (singer)"
 		summary, err = c.getPageSummary(ctx, singerName)
 		if err == nil && summary.Extract != "" {
-			return c.cleanExtract(summary.Extract), nil
+			return c.cleanExtract(summary.Extract), summary.SourceURL, nil
 		}
 	}
 
-	return "", ErrNotFound
+	return "", "", ErrNotFound
 }
 
 func (c *Client) isLikelyArtistSummary(artistName string, summary *Summary) bool {
@@ -222,9 +228,10 @@ func (c *Client) getPageSummary(ctx context.Context, title string) (*Summary, er
 		}
 
 		return &Summary{
-			Title:   payload.Title,
-			Extract: payload.Extract,
-			Type:    payload.Type,
+			Title:     payload.Title,
+			Extract:   payload.Extract,
+			Type:      payload.Type,
+			SourceURL: payload.ContentURLs.Desktop.Page,
 		}, nil
 	case http.StatusNotFound:
 		return nil, ErrNotFound

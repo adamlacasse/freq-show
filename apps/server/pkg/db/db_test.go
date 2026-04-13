@@ -22,7 +22,7 @@ func TestStoreSaveAndGetArtist(t *testing.T) {
 		ID:       testArtistID,
 		Name:     "Test Artist",
 		Genres:   []string{"rock"},
-		Related:  []string{"other"},
+		Related:  []data.RelatedArtist{{ID: "other", Name: "Other Artist"}},
 		Aliases:  []string{"Alias"},
 		Albums:   []data.Album{{ID: "album-1", Tracks: []data.Track{{Number: 1, Title: "Intro"}}}},
 		LifeSpan: data.LifeSpan{Begin: "2000-01-01"},
@@ -48,7 +48,7 @@ func TestStoreSaveAndGetArtist(t *testing.T) {
 
 	// Mutate the fetched copy to ensure the stored record is not modified.
 	fetched.Genres[0] = "pop"
-	fetched.Related = append(fetched.Related, "new")
+	fetched.Related = append(fetched.Related, data.RelatedArtist{ID: "new", Name: "New Artist"})
 	fetched.Aliases[0] = "Changed"
 	fetched.Albums[0].Tracks[0].Title = "Changed"
 
@@ -61,6 +61,9 @@ func TestStoreSaveAndGetArtist(t *testing.T) {
 	}
 	if len(fetchedAgain.Related) != 1 {
 		t.Errorf("expected related slice untouched, got %#v", fetchedAgain.Related)
+	}
+	if fetchedAgain.Related[0].ID != "other" || fetchedAgain.Related[0].Name != "Other Artist" {
+		t.Errorf("expected related artist untouched, got %#v", fetchedAgain.Related)
 	}
 	if fetchedAgain.Aliases[0] != "Alias" {
 		t.Errorf("expected aliases untouched, got %#v", fetchedAgain.Aliases)

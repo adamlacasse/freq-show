@@ -55,9 +55,7 @@ and album detail with full track listings.
 
 See `agent-context/development-log.md` for a chronological narrative of how these pieces evolved.
 
-## Quick Start
-
-To run both the backend API and frontend simultaneously:
+## Local Development
 
 1. **Prerequisites**
 
@@ -65,42 +63,38 @@ To run both the backend API and frontend simultaneously:
 - Node.js 18+ and npm
 - (Optional) SQLite if you want to inspect the generated database file
 
-1. **Clone and Install**
+2. **Clone and Install**
 
  ```bash
  git clone https://github.com/adamlacasse/freq-show.git
  cd freq-show
  ```
 
-1. **Configure Environment** (First time only)
+3. **Configure Environment**
+
+ - Copy .env.example to .env and update any necessary values (e.g., Discogs API credentials)
+ - No further action needed - the run script will load it automatically
+
+4. **Quick Start Script**
 
  ```bash
- # The .env file in the repo root already has OAuth credentials configured
- # No action needed - the run script will load it automatically
+ ./dev.sh
+ # Builds the backend, then starts both services.
+ # Press Ctrl+C to stop both.
+ #   Backend  → http://localhost:8080
+ #   Frontend → http://localhost:4200
  ```
 
-1. **Start Backend** (Terminal 1)
+ > **Manual alternative** (if you need separate terminal output):
+ > ```bash
+ > # Terminal 1 — backend
+ > cd apps/server && go mod download && go build ./cmd/server && cd ../.. && ./apps/server/run.sh
+ >
+ > # Terminal 2 — frontend
+ > cd apps/frontend && npm install && npm start
+ > ```
 
- ```bash
- cd apps/server
- go mod download
- go build ./cmd/server
- ./run.sh
- # Backend runs on http://localhost:8080
- # Loads OAuth credentials from .env automatically
- ```
-
-1. **Start Frontend** (Terminal 2)
-
- ```bash
- cd apps/frontend
- npm install
- npm start
- # Frontend runs on http://localhost:4200
- # Angular SSR proxies /api/* requests to backend
- ```
-
-1. **Try It Out**
+5. **Try It Out**
 
 - Visit <http://localhost:4200>
 - Search for artists like "Beatles", "Nirvana", or "Miles Davis"
@@ -141,7 +135,7 @@ For backend-only development, you can configure environment variables (optional)
 - `REVIEWS_DISCOGS_CONSUMER_SECRET` – Your Discogs OAuth consumer secret (required for reviews)
 - `REVIEWS_DISCOGS_TOKEN` – Optional personal access token (alternative to OAuth)
 
-**Note**: The `.env` file already includes Discogs OAuth credentials for development. Reviews will be fetched automatically when you use the `run.sh` script.
+**Note**: The `.env` file already includes Discogs OAuth credentials for development. Reviews will be fetched automatically when you use `dev.sh` or `run.sh`.
 MusicBrainz requires a contact email and descriptive user agent—update the defaults if you deploy publicly.
 
 ## API Testing

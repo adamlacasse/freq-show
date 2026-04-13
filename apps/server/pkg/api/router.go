@@ -26,7 +26,7 @@ type MusicBrainzClient interface {
 
 // WikipediaClient captures the Wikipedia operations the router relies on.
 type WikipediaClient interface {
-	GetArtistBiography(ctx context.Context, artistName string) (string, error)
+	GetArtistBiography(ctx context.Context, artistName string) (string, string, error)
 }
 
 // ReviewsClient captures the reviews operations the router relies on.
@@ -175,16 +175,43 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, mbClient Mu
 			return nil, newAPIError(http.StatusInternalServerError, "artist lookup failed")
 		}
 		if artist != nil {
-			// If cached artist has no albums, fetch them
+			updated := false
+
+			if artist.BiographyURL == "" && wikiClient != nil && strings.TrimSpace(artist.Name) != "" {
+				if biography, sourceURL, err := wikiClient.GetArtistBiography(ctx, artist.Name); err == nil {
+					if artist.Biography == "" && biography != "" {
+						artist.Biography = biography
+						updated = true
+					}
+					if sourceURL != "" {
+						artist.BiographyURL = sourceURL
+						updated = true
+					}
+				}
+			}
+
+			if (artist.Related == nil || len(artist.Related) == 0) && mbClient != nil {
+				if remoteArtist, err := mbClient.LookupArtist(ctx, id); err == nil {
+					related := transformRelatedArtists(remoteArtist.Relations)
+					if len(related) > 0 {
+						artist.Related = related
+						updated = true
+					}
+				}
+			}
+
+			// If cached artist has no albums, fetch them.
 			if artist.Albums == nil || len(artist.Albums) == 0 {
 				if mbClient != nil {
 					releaseGroups, err := mbClient.GetArtistReleaseGroups(ctx, id, 50, 0)
 					if err == nil {
 						artist.Albums = transformReleaseGroupsToAlbums(releaseGroups.ReleaseGroups)
-						// Update the cached artist with albums
-						_ = repo.SaveArtist(ctx, artist)
+						updated = true
 					}
 				}
+			}
+			if updated {
+				_ = repo.SaveArtist(ctx, artist)
 			}
 			return artist, nil
 		}
@@ -208,9 +235,10 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, mbClient Mu
 
 	// Fetch biography from Wikipedia
 	if wikiClient != nil {
-		biography, err := wikiClient.GetArtistBiography(ctx, remote.Name)
+		biography, sourceURL, err := wikiClient.GetArtistBiography(ctx, remote.Name)
 		if err == nil {
 			domainArtist.Biography = biography
+			domainArtist.BiographyURL = sourceURL
 		}
 		// Continue even if biography fetch fails
 	}
@@ -294,9 +322,10 @@ func transformArtist(src *musicbrainz.Artist) *data.Artist {
 		ID:             src.ID,
 		Name:           src.Name,
 		Biography:      "",
+		BiographyURL:   "",
 		Genres:         append([]string(nil), src.Tags...),
 		Albums:         nil,
-		Related:        nil,
+		Related:        transformRelatedArtists(src.Relations),
 		ImageURL:       "",
 		Country:        src.Country,
 		Type:           src.Type,
@@ -308,6 +337,65 @@ func transformArtist(src *musicbrainz.Artist) *data.Artist {
 			Ended: src.LifeSpan.Ended,
 		},
 	}
+}
+
+func transformRelatedArtists(relations []musicbrainz.ArtistRelation) []data.RelatedArtist {
+	if len(relations) == 0 {
+		return nil
+	}
+
+	ordered := make([]data.RelatedArtist, 0, len(relations))
+	index := make(map[string]int, len(relations))
+
+	for _, relation := range relations {
+		targetType := strings.TrimSpace(relation.TargetType)
+		if targetType != "" && targetType != "artist" {
+			continue
+		}
+
+		id := strings.TrimSpace(relation.Artist.ID)
+		name := strings.TrimSpace(relation.Artist.Name)
+		if id == "" || name == "" {
+			continue
+		}
+
+		if pos, ok := index[id]; ok {
+			if relation.Type != "" && relation.Type != ordered[pos].RelationshipType {
+				ordered[pos].RelationshipType = mergeRelationshipTypes(ordered[pos].RelationshipType, relation.Type)
+			}
+			continue
+		}
+
+		ordered = append(ordered, data.RelatedArtist{
+			ID:               id,
+			Name:             name,
+			RelationshipType: relation.Type,
+		})
+		index[id] = len(ordered) - 1
+	}
+
+	if len(ordered) == 0 {
+		return nil
+	}
+
+	return ordered
+}
+
+func mergeRelationshipTypes(existing, next string) string {
+	existing = strings.TrimSpace(existing)
+	next = strings.TrimSpace(next)
+	if existing == "" {
+		return next
+	}
+	if next == "" {
+		return existing
+	}
+	for _, value := range strings.Split(existing, ", ") {
+		if value == next {
+			return existing
+		}
+	}
+	return existing + ", " + next
 }
 
 func transformAlbum(src *musicbrainz.ReleaseGroup) *data.Album {
@@ -468,7 +556,7 @@ func normalizeArtistForJSON(artist *data.Artist) *data.Artist {
 		artist.Albums = []data.Album{}
 	}
 	if artist.Related == nil {
-		artist.Related = []string{}
+		artist.Related = []data.RelatedArtist{}
 	}
 	if artist.Aliases == nil {
 		artist.Aliases = []string{}

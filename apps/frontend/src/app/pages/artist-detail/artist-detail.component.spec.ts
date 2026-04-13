@@ -3,19 +3,38 @@ import { provideHttpClient } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, ParamMap, convertToParamMap, provideRouter } from '@angular/router';
 import { BehaviorSubject, of, throwError } from 'rxjs';
+import type { components } from '../../models/openapi-types.generated';
 
 import { ArtistService } from '../../services/artist.service';
 import { ArtistDetailComponent } from './artist-detail.component';
 
 describe('ArtistDetailComponent', () => {
   const artistId = 'artist-1';
-  const mockArtist = {
+  type BaseArtist = components['schemas']['Artist'];
+  type RelatedArtist = {
+    id: string;
+    name: string;
+    relationshipType?: string;
+  };
+  type Artist = Omit<BaseArtist, 'related'> & {
+    biographyUrl?: string;
+    related: RelatedArtist[];
+  };
+
+  const mockArtist: Artist = {
     id: artistId,
     name: 'Test Artist',
     biography: 'Biography',
+    biographyUrl: 'https://en.wikipedia.org/wiki/Test_Artist',
     genres: [],
     albums: [],
-    related: [],
+    related: [
+      {
+        id: 'artist-2',
+        name: 'Related Artist',
+        relationshipType: 'member of'
+      }
+    ],
     imageUrl: '',
     aliases: [],
     lifeSpan: { begin: '1990', end: '', ended: false }
@@ -60,6 +79,8 @@ describe('ArtistDetailComponent', () => {
 
       httpMock.expectNone(`/api/artists/${artistId}`);
       expect(fixture.nativeElement.textContent).toContain('Test Artist');
+      expect(fixture.nativeElement.textContent).toContain('Read the Wikipedia source');
+      expect(fixture.nativeElement.textContent).toContain('Related Artist');
     });
   });
 
@@ -75,7 +96,7 @@ describe('ArtistDetailComponent', () => {
 
       artistService.getArtist.and.returnValues(
         throwError(() => new Error('boom')),
-        of(mockArtist)
+        of(mockArtist) as any
       );
 
       await TestBed.configureTestingModule({
@@ -109,6 +130,7 @@ describe('ArtistDetailComponent', () => {
 
       expect(artistService.getArtist).toHaveBeenCalledTimes(2);
       expect(fixture.nativeElement.textContent).toContain('Test Artist');
+      expect(fixture.nativeElement.textContent).toContain('Read the Wikipedia source');
     });
   });
 });

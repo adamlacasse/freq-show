@@ -101,15 +101,23 @@ export interface components {
             id: string;
             name: string;
             biography: string;
+            /** @description Canonical Wikipedia page URL when the biography was sourced from Wikipedia. */
+            biographyUrl?: string;
             genres: string[];
             albums: components["schemas"]["Album"][];
-            related: string[];
+            related: components["schemas"]["RelatedArtist"][];
             imageUrl: string;
             country?: string | null;
             type?: string | null;
             disambiguation?: string | null;
             aliases?: string[];
             lifeSpan: components["schemas"]["LifeSpan"];
+        };
+        RelatedArtist: {
+            id: string;
+            name: string;
+            /** @description MusicBrainz relation type connecting this artist to the current artist. */
+            relationshipType?: string;
         };
         LifeSpan: {
             begin?: string | null;

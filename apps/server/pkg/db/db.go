@@ -114,7 +114,7 @@ func cloneArtist(src *data.Artist) *data.Artist {
 	}
 	copyArtist := *src
 	copyArtist.Genres = append([]string(nil), src.Genres...)
-	copyArtist.Related = append([]string(nil), src.Related...)
+	copyArtist.Related = append([]data.RelatedArtist(nil), src.Related...)
 	copyArtist.Aliases = append([]string(nil), src.Aliases...)
 	copyArtist.Albums = cloneAlbums(src.Albums)
 	return &copyArtist

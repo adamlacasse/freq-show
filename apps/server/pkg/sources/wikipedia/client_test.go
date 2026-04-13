@@ -22,7 +22,12 @@ func TestClient_GetArtistBiography_FallsBackWhenDirectTitleIsNotArtist(t *testin
 			_, _ = w.Write([]byte(`{
 				"type": "standard",
 				"title": "Nirvana",
-				"extract": "Nirvana is the ultimate goal of Buddhism, representing liberation from suffering."
+				"extract": "Nirvana is the ultimate goal of Buddhism, representing liberation from suffering.",
+				"content_urls": {
+					"desktop": {
+						"page": "https://en.wikipedia.org/wiki/Nirvana"
+					}
+				}
 			}`))
 			return
 		case "/page/summary/Nirvana (band)", "/page/summary/Nirvana%20(band)":
@@ -30,7 +35,12 @@ func TestClient_GetArtistBiography_FallsBackWhenDirectTitleIsNotArtist(t *testin
 			_, _ = w.Write([]byte(`{
 				"type": "standard",
 				"title": "Nirvana (band)",
-				"extract": "Nirvana was an American rock band formed in Aberdeen, Washington, in 1987. Founded by Kurt Cobain and Krist Novoselic."
+				"extract": "Nirvana was an American rock band formed in Aberdeen, Washington, in 1987. Founded by Kurt Cobain and Krist Novoselic.",
+				"content_urls": {
+					"desktop": {
+						"page": "https://en.wikipedia.org/wiki/Nirvana_(band)"
+					}
+				}
 			}`))
 			return
 		default:
@@ -49,7 +59,7 @@ func TestClient_GetArtistBiography_FallsBackWhenDirectTitleIsNotArtist(t *testin
 		t.Fatalf("New() error: %v", err)
 	}
 
-	bio, err := client.GetArtistBiography(context.Background(), "Nirvana")
+	bio, sourceURL, err := client.GetArtistBiography(context.Background(), "Nirvana")
 	if err != nil {
 		t.Fatalf("GetArtistBiography error: %v", err)
 	}
@@ -59,5 +69,8 @@ func TestClient_GetArtistBiography_FallsBackWhenDirectTitleIsNotArtist(t *testin
 	}
 	if !strings.Contains(bio, "American rock band") {
 		t.Fatalf("expected band biography, got: %q", bio)
+	}
+	if sourceURL != "https://en.wikipedia.org/wiki/Nirvana_(band)" {
+		t.Fatalf("expected band source URL, got %q", sourceURL)
 	}
 }

@@ -86,14 +86,29 @@ func New(_ context.Context, cfg Config) (*Client, error) {
 
 // Artist models a subset of the MusicBrainz artist payload.
 type Artist struct {
-	ID             string   `json:"id"`
-	Name           string   `json:"name"`
-	Country        string   `json:"country,omitempty"`
-	Type           string   `json:"type,omitempty"`
-	Disambiguation string   `json:"disambiguation,omitempty"`
-	Aliases        []string `json:"aliases"`
-	Tags           []string `json:"tags,omitempty"`
-	LifeSpan       LifeSpan `json:"lifeSpan"`
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	Country        string           `json:"country,omitempty"`
+	Type           string           `json:"type,omitempty"`
+	Disambiguation string           `json:"disambiguation,omitempty"`
+	Aliases        []string         `json:"aliases"`
+	Tags           []string         `json:"tags,omitempty"`
+	LifeSpan       LifeSpan         `json:"lifeSpan"`
+	Relations      []ArtistRelation `json:"relations,omitempty"`
+}
+
+// ArtistRelation represents a relationship from one artist to another.
+type ArtistRelation struct {
+	Type       string         `json:"type"`
+	Direction  string         `json:"direction"`
+	TargetType string         `json:"targetType"`
+	Artist     RelationArtist `json:"artist"`
+}
+
+// RelationArtist represents the target artist in an artist relation.
+type RelationArtist struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // ReleaseGroup models an album (release group) payload from MusicBrainz.
@@ -160,7 +175,16 @@ type artistResponse struct {
 		Name  string `json:"name"`
 		Count int    `json:"count"`
 	} `json:"tags"`
-	LifeSpan LifeSpan `json:"life-span"`
+	LifeSpan  LifeSpan `json:"life-span"`
+	Relations []struct {
+		Type       string `json:"type"`
+		Direction  string `json:"direction"`
+		TargetType string `json:"target-type"`
+		Artist     struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"artist"`
+	} `json:"relations"`
 }
 
 type releaseGroupResponse struct {
@@ -213,7 +237,7 @@ func (c *Client) LookupArtist(ctx context.Context, id string) (*Artist, error) {
 		return nil, errors.New("musicbrainz: artist id is required")
 	}
 
-	endpoint := fmt.Sprintf("%s/artist/%s?fmt=json&inc=tags", c.baseURL, url.PathEscape(trimmed))
+	endpoint := fmt.Sprintf("%s/artist/%s?fmt=json&inc=tags+artist-rels", c.baseURL, url.PathEscape(trimmed))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf(errRequestBuildFailed, err)
@@ -267,7 +291,44 @@ func transformArtist(payload artistResponse) *Artist {
 		Aliases:        aliases,
 		Tags:           tags,
 		LifeSpan:       payload.LifeSpan,
+		Relations:      transformArtistRelations(payload.Relations),
 	}
+}
+
+func transformArtistRelations(payload []struct {
+	Type       string `json:"type"`
+	Direction  string `json:"direction"`
+	TargetType string `json:"target-type"`
+	Artist     struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"artist"`
+}) []ArtistRelation {
+	if len(payload) == 0 {
+		return nil
+	}
+
+	relations := make([]ArtistRelation, 0, len(payload))
+	for _, relation := range payload {
+		if strings.TrimSpace(relation.Artist.ID) == "" || strings.TrimSpace(relation.Artist.Name) == "" {
+			continue
+		}
+		relations = append(relations, ArtistRelation{
+			Type:       relation.Type,
+			Direction:  relation.Direction,
+			TargetType: relation.TargetType,
+			Artist: RelationArtist{
+				ID:   relation.Artist.ID,
+				Name: relation.Artist.Name,
+			},
+		})
+	}
+
+	if len(relations) == 0 {
+		return nil
+	}
+
+	return relations
 }
 
 // isGenreTag filters out non-genre tags like years, places, etc.

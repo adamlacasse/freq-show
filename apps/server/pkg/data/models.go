@@ -1,18 +1,25 @@
 package data
 
 type Artist struct {
-	ID             string   `json:"id"`
-	Name           string   `json:"name"`
-	Biography      string   `json:"biography"`
-	Genres         []string `json:"genres"`
-	Albums         []Album  `json:"albums"`
-	Related        []string `json:"related"`
-	ImageURL       string   `json:"imageUrl"`
-	Country        string   `json:"country,omitempty"`
-	Type           string   `json:"type,omitempty"`
-	Disambiguation string   `json:"disambiguation,omitempty"`
-	Aliases        []string `json:"aliases"`
-	LifeSpan       LifeSpan `json:"lifeSpan"`
+	ID             string          `json:"id"`
+	Name           string          `json:"name"`
+	Biography      string          `json:"biography"`
+	BiographyURL   string          `json:"biographyUrl,omitempty"`
+	Genres         []string        `json:"genres"`
+	Albums         []Album         `json:"albums"`
+	Related        []RelatedArtist `json:"related"`
+	ImageURL       string          `json:"imageUrl"`
+	Country        string          `json:"country,omitempty"`
+	Type           string          `json:"type,omitempty"`
+	Disambiguation string          `json:"disambiguation,omitempty"`
+	Aliases        []string        `json:"aliases"`
+	LifeSpan       LifeSpan        `json:"lifeSpan"`
+}
+
+type RelatedArtist struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	RelationshipType string `json:"relationshipType,omitempty"`
 }
 
 type LifeSpan struct {

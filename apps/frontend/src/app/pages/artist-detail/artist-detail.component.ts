@@ -1,15 +1,26 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
-import { Subject, Subscription, takeUntil } from 'rxjs';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Observable, Subject, Subscription, takeUntil } from 'rxjs';
 import { ArtistService } from '../../services/artist.service';
 import type { components } from '../../models/openapi-types.generated';
 
-type Artist = components['schemas']['Artist'];
+type BaseArtist = components['schemas']['Artist'];
+
+type RelatedArtist = {
+  id: string;
+  name: string;
+  relationshipType?: string;
+};
+
+type Artist = Omit<BaseArtist, 'related'> & {
+  biographyUrl?: string;
+  related: RelatedArtist[];
+};
 
 @Component({
     selector: 'app-artist-detail',
-    imports: [CommonModule],
+    imports: [CommonModule, RouterLink],
     templateUrl: './artist-detail.component.html',
     styleUrl: './artist-detail.component.css'
 })
@@ -65,7 +76,7 @@ export class ArtistDetailComponent implements OnInit, OnDestroy {
     this.error = null;
     this.activeLoad?.unsubscribe();
 
-    this.activeLoad = this.artistService.getArtist(artistId)
+    this.activeLoad = (this.artistService.getArtist(artistId) as unknown as Observable<Artist>)
       .subscribe({
         next: (artist: Artist) => {
           this.artist = artist;
@@ -110,6 +121,10 @@ export class ArtistDetailComponent implements OnInit, OnDestroy {
 
   trackByAlbumId(index: number, album: any): string {
     return album.id;
+  }
+
+  trackByRelatedArtistId(index: number, relatedArtist: RelatedArtist): string {
+    return relatedArtist.id;
   }
 
   onAlbumClick(album: any): void {
