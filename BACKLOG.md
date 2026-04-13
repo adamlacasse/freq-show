@@ -8,6 +8,8 @@
 
 - **Resolve related artists** — The artist detail page displays related artist IDs as raw strings instead of resolving them to names. These should either be fetched and displayed as clickable links, or hidden until they can be.
 
+- **Link biographies to Wikipedia source** — Artist biography sections should include a link to the underlying Wikipedia page when the biography was sourced from Wikipedia, so users can verify and continue reading from the original source.
+
 - **Add retry UI on errors** — When an API request fails, the user sees a generic message with no way to recover other than refreshing the browser. Add a "Try again" button to error states on search, artist detail, and album detail pages.
 
 - **Client-side cache for detail pages** — Artist and album detail pages re-fetch from the server on every navigation. A lightweight in-memory cache (e.g. last 20 viewed items) would make back-navigation feel instant and reduce unnecessary API calls.
@@ -17,3 +19,5 @@
 ## Data / Integrations
 
 - **Rethink Discogs usage** — The Reviews section currently pulls data from Discogs, which surfaces pressing-specific detail (format, label, catalog number, etc.) rather than general album information. Evaluate whether Discogs is the right source for this use case, or whether a different data source or a narrower Discogs query would better serve the app's goals.
+
+- **Add Spotify deep links for tracks** — Resolve album tracks to Spotify track URLs where possible and show a "Play on Spotify" link from the track listing. Start with outbound deep links only; do not add embedded or in-app playback yet.

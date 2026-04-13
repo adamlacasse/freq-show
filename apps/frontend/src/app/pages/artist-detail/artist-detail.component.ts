@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { Subject, takeUntil, switchMap, EMPTY } from 'rxjs';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Subject, Subscription, takeUntil } from 'rxjs';
 import { ArtistService } from '../../services/artist.service';
 import type { components } from '../../models/openapi-types.generated';
 
@@ -9,7 +9,7 @@ type Artist = components['schemas']['Artist'];
 
 @Component({
     selector: 'app-artist-detail',
-    imports: [CommonModule, RouterLink],
+    imports: [CommonModule],
     templateUrl: './artist-detail.component.html',
     styleUrl: './artist-detail.component.css'
 })
@@ -17,6 +17,8 @@ export class ArtistDetailComponent implements OnInit, OnDestroy {
   artist: Artist | null = null;
   isLoading = false;
   error: string | null = null;
+  private artistId: string | null = null;
+  private activeLoad?: Subscription;
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -27,38 +29,55 @@ export class ArtistDetailComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.route.paramMap
-      .pipe(
-        takeUntil(this.destroy$),
-        switchMap(params => {
-          const artistId = params.get('id');
-          if (artistId) {
-            this.isLoading = true;
-            this.error = null;
-            return this.artistService.getArtist(artistId);
-          }
-          return EMPTY;
-        })
-      )
-      .subscribe({
-        next: (artist: Artist) => {
-          this.artist = artist;
-          this.isLoading = false;
-        },
-        error: (error: any) => {
-          console.error('Error loading artist:', error);
-          this.error = 'Failed to load artist information.';
-          this.isLoading = false;
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(params => {
+        const artistId = params.get('id');
+        if (artistId) {
+          this.loadArtist(artistId);
+          return;
         }
+
+        this.artistId = null;
+        this.artist = null;
+        this.error = 'Artist id is required.';
       });
   }
 
   ngOnDestroy(): void {
+    this.activeLoad?.unsubscribe();
     this.destroy$.next();
     this.destroy$.complete();
   }
 
   goBack(): void {
     this.router.navigate(['/']);
+  }
+
+  retry(): void {
+    if (this.artistId) {
+      this.loadArtist(this.artistId);
+    }
+  }
+
+  private loadArtist(artistId: string): void {
+    this.artistId = artistId;
+    this.isLoading = true;
+    this.error = null;
+    this.activeLoad?.unsubscribe();
+
+    this.activeLoad = this.artistService.getArtist(artistId)
+      .subscribe({
+        next: (artist: Artist) => {
+          this.artist = artist;
+          this.isLoading = false;
+        },
+        error: (error: unknown) => {
+          console.error('Error loading artist:', error);
+          this.artist = null;
+          this.error = 'Failed to load artist information.';
+          this.isLoading = false;
+        }
+      });
   }
 
   getLifeSpanDisplay(artist: Artist): string {
@@ -91,10 +110,6 @@ export class ArtistDetailComponent implements OnInit, OnDestroy {
 
   trackByAlbumId(index: number, album: any): string {
     return album.id;
-  }
-
-  trackByRelatedId(index: number, relatedId: string): string {
-    return relatedId;
   }
 
   onAlbumClick(album: any): void {

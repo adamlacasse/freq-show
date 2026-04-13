@@ -23,4 +23,12 @@ describe('HomeComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('should describe the current product instead of a roadmap', () => {
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('What is live now');
+    expect(compiled.textContent).toContain('Current sources');
+    expect(compiled.textContent).not.toContain('Build roadmap');
+  });
 });

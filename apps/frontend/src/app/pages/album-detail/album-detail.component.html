@@ -14,14 +14,22 @@
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
       </svg>
     </div>
-    <h2 class="mt-4 text-2xl font-semibold text-white">Album Not Found</h2>
+    <h2 class="mt-4 text-2xl font-semibold text-white">Unable to load album information</h2>
     <p class="mt-2 text-freq-cream/70">{{ error }}</p>
+    <div class="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+    <button 
+      (click)="retry()"
+      class="rounded-full bg-freq-teal px-6 py-2 font-medium text-freq-ink transition hover:bg-freq-teal/90"
+    >
+      Try again
+    </button>
     <button 
       (click)="goBack()"
-      class="mt-6 rounded-full bg-freq-teal px-6 py-2 font-medium text-freq-ink transition hover:bg-freq-teal/90"
+      class="rounded-full border border-white/20 bg-white/5 px-6 py-2 font-medium text-freq-cream transition hover:border-white/40 hover:bg-white/10"
     >
       ← Back to Search
     </button>
+    </div>
   </div>
 </div>
 

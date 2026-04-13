@@ -18,6 +18,7 @@ type Artist = components['schemas']['SearchArtist'];
 export class SearchComponent implements OnDestroy {
   searchQuery = '';
   searchResults: SearchResult | null = null;
+  searchError: string | null = null;
   isSearching = false;
   private destroy$ = new Subject<void>();
   private searchSubject = new Subject<string>();
@@ -31,6 +32,18 @@ export class SearchComponent implements OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe((results: SearchResult | null) => {
         this.searchResults = results;
+      });
+
+    this.searchService.searchError$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((error: string | null) => {
+        this.searchError = error;
+      });
+
+    this.searchService.searchReset$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.resetComponentState(true);
       });
 
     // Debounce search input. 800ms gives MusicBrainz (~1 req/s limit) enough
@@ -60,6 +73,7 @@ export class SearchComponent implements OnDestroy {
 
   performSearch(query: string): void {
     this.isSearching = true;
+    this.searchError = null;
     this.searchService.searchArtists({
       q: query,
       limit: 10
@@ -75,8 +89,15 @@ export class SearchComponent implements OnDestroy {
   }
 
   clearSearch(): void {
-    this.searchService.clearSearchResults();
-    this.searchResults = null;
+    this.searchService.clearSearchState();
+    this.resetComponentState(false);
+  }
+
+  retrySearch(): void {
+    const trimmed = this.searchQuery.trim();
+    if (trimmed.length >= 2) {
+      this.performSearch(trimmed);
+    }
   }
 
   getArtistDisplayInfo(artist: Artist): string {
@@ -129,7 +150,19 @@ export class SearchComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.resetComponentState(true);
+    this.searchService.clearSearchState();
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  private resetComponentState(clearQuery: boolean): void {
+    this.searchResults = null;
+    this.searchError = null;
+    this.isSearching = false;
+
+    if (clearQuery) {
+      this.searchQuery = '';
+    }
   }
 }

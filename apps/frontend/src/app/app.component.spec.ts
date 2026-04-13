@@ -1,13 +1,30 @@
+import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { AppComponent } from './app.component';
-import { routes } from './app.routes';
+import { SearchService } from './services/search.service';
+
+@Component({
+  standalone: true,
+  template: ''
+})
+class DummyComponent {}
 
 describe('AppComponent', () => {
+  let searchServiceSpy: jasmine.SpyObj<SearchService>;
+
   beforeEach(async () => {
+    searchServiceSpy = jasmine.createSpyObj<SearchService>('SearchService', ['requestSearchReset']);
+
     await TestBed.configureTestingModule({
       imports: [AppComponent],
-      providers: [provideRouter(routes)],
+      providers: [
+        provideRouter([
+          { path: '', component: DummyComponent },
+          { path: 'artists/:id', component: DummyComponent },
+        ]),
+        { provide: SearchService, useValue: searchServiceSpy }
+      ],
     }).compileComponents();
   });
 
@@ -28,5 +45,25 @@ describe('AppComponent', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('header a')?.textContent).toContain('FreqShow');
+  });
+
+  it('should clear search state when the home link is used', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    const app = fixture.componentInstance;
+
+    app.onHomeClick();
+
+    expect(searchServiceSpy.requestSearchReset).toHaveBeenCalled();
+  });
+
+  it('should clear search state after navigating away from home', async () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/artists/123');
+    await fixture.whenStable();
+
+    expect(searchServiceSpy.requestSearchReset).toHaveBeenCalled();
   });
 });

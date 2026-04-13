@@ -1,26 +1,125 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ActivatedRoute, ParamMap, convertToParamMap, provideRouter } from '@angular/router';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 
+import { AlbumService } from '../../services/album.service';
 import { AlbumDetailComponent } from './album-detail.component';
 
 describe('AlbumDetailComponent', () => {
-  let component: AlbumDetailComponent;
-  let fixture: ComponentFixture<AlbumDetailComponent>;
+  const albumId = 'album-1';
+  const mockAlbum = {
+    id: albumId,
+    title: 'Test Album',
+    artistId: 'artist-1',
+    artistName: 'Test Artist',
+    primaryType: 'Album',
+    secondaryTypes: [],
+    firstReleaseDate: '1999-01-01',
+    year: 1999,
+    genre: '',
+    label: '',
+    tracks: [],
+    review: {
+      source: '',
+      author: '',
+      rating: 0,
+      summary: '',
+      text: '',
+      url: ''
+    },
+    coverUrl: ''
+  };
 
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      imports: [AlbumDetailComponent],
-      providers: [provideRouter([]), provideHttpClient()]
-    })
-    .compileComponents();
-    
-    fixture = TestBed.createComponent(AlbumDetailComponent);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
+  describe('with cached service responses', () => {
+    let fixture: ComponentFixture<AlbumDetailComponent>;
+    let routeParams$: BehaviorSubject<ParamMap>;
+    let httpMock: HttpTestingController;
+
+    beforeEach(async () => {
+      routeParams$ = new BehaviorSubject(convertToParamMap({ id: albumId }));
+
+      await TestBed.configureTestingModule({
+        imports: [AlbumDetailComponent],
+        providers: [
+          provideRouter([]),
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          {
+            provide: ActivatedRoute,
+            useValue: { paramMap: routeParams$.asObservable() }
+          }
+        ]
+      }).compileComponents();
+
+      fixture = TestBed.createComponent(AlbumDetailComponent);
+      httpMock = TestBed.inject(HttpTestingController);
+      fixture.detectChanges();
+    });
+
+    afterEach(() => {
+      httpMock.verify();
+    });
+
+    it('reuses the cached album on repeat navigation', () => {
+      const firstRequest = httpMock.expectOne(`/api/albums/${albumId}`);
+      firstRequest.flush(mockAlbum);
+
+      routeParams$.next(convertToParamMap({ id: albumId }));
+      fixture.detectChanges();
+
+      httpMock.expectNone(`/api/albums/${albumId}`);
+      expect(fixture.nativeElement.textContent).toContain('Test Album');
+    });
   });
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
+  describe('retry behavior', () => {
+    let fixture: ComponentFixture<AlbumDetailComponent>;
+    let albumService: jasmine.SpyObj<AlbumService>;
+    let routeParams$: BehaviorSubject<ParamMap>;
+
+    beforeEach(async () => {
+      routeParams$ = new BehaviorSubject(convertToParamMap({ id: albumId }));
+      albumService = jasmine.createSpyObj<AlbumService>('AlbumService', ['getAlbum']);
+      spyOn(console, 'error');
+
+      albumService.getAlbum.and.returnValues(
+        throwError(() => new Error('boom')),
+        of(mockAlbum)
+      );
+
+      await TestBed.configureTestingModule({
+        imports: [AlbumDetailComponent],
+        providers: [
+          provideRouter([]),
+          {
+            provide: ActivatedRoute,
+            useValue: { paramMap: routeParams$.asObservable() }
+          },
+          {
+            provide: AlbumService,
+            useValue: albumService
+          }
+        ]
+      }).compileComponents();
+
+      fixture = TestBed.createComponent(AlbumDetailComponent);
+      fixture.detectChanges();
+    });
+
+    it('shows a retry action when loading fails and reloads on click', () => {
+      expect(fixture.nativeElement.textContent).toContain('Failed to load album information.');
+
+      const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+      const retryButton = buttons.find(button => button.textContent?.includes('Try again'));
+      expect(retryButton).toBeTruthy();
+
+      retryButton?.click();
+      fixture.detectChanges();
+
+      expect(albumService.getAlbum).toHaveBeenCalledTimes(2);
+      expect(fixture.nativeElement.textContent).toContain('Test Album');
+    });
   });
 });
