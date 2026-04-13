@@ -19,6 +19,7 @@ const (
 	defaultMusicBrainzVer            = "1.0"
 	defaultMusicBrainzContact        = "adamlacasse@outlook.com"
 	defaultMusicBrainzTimeoutSeconds = 6
+	defaultMusicBrainzMinIntervalMS  = 1100
 	defaultWikipediaBase             = "https://en.wikipedia.org/api/rest_v1"
 	defaultWikipediaUserAgent        = "FreqShow/1.0 (https://github.com/adamlacasse/freq-show)"
 	defaultWikipediaTimeoutSeconds   = 8
@@ -33,6 +34,7 @@ const (
 	databaseURLEnv                  = "DATABASE_URL"
 	musicBrainzBaseURLEnv           = "MUSICBRAINZ_BASE_URL"
 	musicBrainzTimeoutEnv           = "MUSICBRAINZ_TIMEOUT_SECONDS"
+	musicBrainzMinIntervalEnv       = "MUSICBRAINZ_MIN_INTERVAL_MS"
 	musicBrainzAppNameEnv           = "MUSICBRAINZ_APP_NAME"
 	musicBrainzAppVersionEnv        = "MUSICBRAINZ_APP_VERSION"
 	musicBrainzContactEnv           = "MUSICBRAINZ_CONTACT"
@@ -59,11 +61,12 @@ type Config struct {
 
 // MusicBrainzConfig describes how the MusicBrainz client should connect.
 type MusicBrainzConfig struct {
-	BaseURL    string
-	AppName    string
-	AppVersion string
-	Contact    string
-	Timeout    time.Duration
+	BaseURL     string
+	AppName     string
+	AppVersion  string
+	Contact     string
+	Timeout     time.Duration
+	MinInterval time.Duration
 }
 
 // WikipediaConfig describes how the Wikipedia client should connect.
@@ -247,16 +250,28 @@ func resolveMusicBrainz() (MusicBrainzConfig, error) {
 		}
 	}
 
+	minInterval := time.Duration(defaultMusicBrainzMinIntervalMS) * time.Millisecond
+	if rawMinInterval, ok := lookupNonEmpty(musicBrainzMinIntervalEnv); ok {
+		millis, err := strconv.Atoi(rawMinInterval)
+		if err != nil {
+			return MusicBrainzConfig{}, fmt.Errorf("invalid %s value %q: %w", musicBrainzMinIntervalEnv, rawMinInterval, err)
+		}
+		if millis > 0 {
+			minInterval = time.Duration(millis) * time.Millisecond
+		}
+	}
+
 	appName := envOrDefault(musicBrainzAppNameEnv, defaultMusicBrainzApp)
 	appVersion := envOrDefault(musicBrainzAppVersionEnv, defaultMusicBrainzVer)
 	contact := envOrDefault(musicBrainzContactEnv, defaultMusicBrainzContact)
 
 	return MusicBrainzConfig{
-		BaseURL:    strings.TrimRight(baseURL, "/"),
-		AppName:    strings.TrimSpace(appName),
-		AppVersion: strings.TrimSpace(appVersion),
-		Contact:    strings.TrimSpace(contact),
-		Timeout:    timeout,
+		BaseURL:     strings.TrimRight(baseURL, "/"),
+		AppName:     strings.TrimSpace(appName),
+		AppVersion:  strings.TrimSpace(appVersion),
+		Contact:     strings.TrimSpace(contact),
+		Timeout:     timeout,
+		MinInterval: minInterval,
 	}, nil
 }
 

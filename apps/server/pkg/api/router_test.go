@@ -722,3 +722,57 @@ func TestSearchHandlerNormalizesAliases(t *testing.T) {
 		t.Fatalf("expected aliases to be an empty slice")
 	}
 }
+
+func TestSearchHandlerReturnsRateLimit(t *testing.T) {
+	mb := &stubMusicBrainz{
+		searchArtistsFunc: func(ctx context.Context, query string, limit int, offset int) (*musicbrainz.SearchResult, error) {
+			return nil, musicbrainz.ErrRateLimit
+		},
+	}
+
+	handler := searchHandler(mb)
+	req := httptest.NewRequest(http.MethodGet, "/search?q=artist", nil)
+	resp := httptest.NewRecorder()
+
+	handler.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected status 429, got %d", resp.Code)
+	}
+}
+
+func TestArtistLookupHandlerReturnsRateLimit(t *testing.T) {
+	repo := &stubArtistRepo{}
+	mb := &stubMusicBrainz{
+		lookupArtistFunc: func(ctx context.Context, id string) (*musicbrainz.Artist, error) {
+			return nil, musicbrainz.ErrRateLimit
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, artistPath, nil)
+	res := httptest.NewRecorder()
+
+	artistLookupHandler(repo, mb, &stubWikipedia{}).ServeHTTP(res, req)
+
+	if res.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected status 429, got %d", res.Code)
+	}
+}
+
+func TestAlbumLookupHandlerReturnsRateLimit(t *testing.T) {
+	repo := &stubAlbumRepo{}
+	mb := &stubMusicBrainz{
+		lookupReleaseGroupFunc: func(ctx context.Context, id string) (*musicbrainz.ReleaseGroup, error) {
+			return nil, musicbrainz.ErrRateLimit
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, albumPath, nil)
+	res := httptest.NewRecorder()
+
+	albumLookupHandler(repo, mb, &stubReviews{}).ServeHTTP(res, req)
+
+	if res.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected status 429, got %d", res.Code)
+	}
+}

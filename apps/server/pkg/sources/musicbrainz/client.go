@@ -10,13 +10,14 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 // ErrNotFound indicates the requested resource was not present in MusicBrainz.
 var ErrNotFound = errors.New("musicbrainz: resource not found")
 
-// ErrRateLimit indicates the MusicBrainz API has returned a 429 Too Many Requests response.
+// ErrRateLimit indicates the MusicBrainz API has throttled the request.
 var ErrRateLimit = errors.New("musicbrainz: rate limit exceeded")
 
 const (
@@ -26,23 +27,30 @@ const (
 	errUnexpectedStatus   = "musicbrainz: unexpected status %d: %s"
 	headerUserAgent       = "User-Agent"
 	headerAccept          = "Accept"
+	headerRetryAfter      = "Retry-After"
 	contentTypeJSON       = "application/json"
+	defaultMinInterval    = 1100 * time.Millisecond
+	maxAttempts           = 2
 )
 
 // Config describes how to connect to the MusicBrainz API.
 type Config struct {
-	BaseURL    string
-	AppName    string
-	AppVersion string
-	Contact    string
-	Timeout    time.Duration
+	BaseURL     string
+	AppName     string
+	AppVersion  string
+	Contact     string
+	Timeout     time.Duration
+	MinInterval time.Duration
 }
 
 // Client issues requests against the MusicBrainz API.
 type Client struct {
-	baseURL    string
-	userAgent  string
-	httpClient *http.Client
+	baseURL       string
+	userAgent     string
+	httpClient    *http.Client
+	minInterval   time.Duration
+	mu            sync.Mutex
+	nextRequestAt time.Time
 }
 
 // New constructs a MusicBrainz API client using the supplied configuration.
@@ -52,6 +60,9 @@ func New(_ context.Context, cfg Config) (*Client, error) {
 	}
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = 5 * time.Second
+	}
+	if cfg.MinInterval <= 0 {
+		cfg.MinInterval = defaultMinInterval
 	}
 
 	contact := strings.TrimSpace(cfg.Contact)
@@ -81,6 +92,7 @@ func New(_ context.Context, cfg Config) (*Client, error) {
 		httpClient: &http.Client{
 			Timeout: cfg.Timeout,
 		},
+		minInterval: cfg.MinInterval,
 	}, nil
 }
 
@@ -238,32 +250,11 @@ func (c *Client) LookupArtist(ctx context.Context, id string) (*Artist, error) {
 	}
 
 	endpoint := fmt.Sprintf("%s/artist/%s?fmt=json&inc=tags+artist-rels", c.baseURL, url.PathEscape(trimmed))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf(errRequestBuildFailed, err)
+	var payload artistResponse
+	if err := c.getJSON(ctx, endpoint, &payload); err != nil {
+		return nil, err
 	}
-	req.Header.Set(headerUserAgent, c.userAgent)
-	req.Header.Set(headerAccept, contentTypeJSON)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf(errRequestFailed, err)
-	}
-	defer resp.Body.Close()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		var payload artistResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			return nil, fmt.Errorf(errDecodeFailed, err)
-		}
-		return transformArtist(payload), nil
-	case http.StatusNotFound:
-		return nil, ErrNotFound
-	default:
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, fmt.Errorf(errUnexpectedStatus, resp.StatusCode, strings.TrimSpace(string(snippet)))
-	}
+	return transformArtist(payload), nil
 }
 
 func transformArtist(payload artistResponse) *Artist {
@@ -402,32 +393,11 @@ func (c *Client) LookupReleaseGroup(ctx context.Context, id string) (*ReleaseGro
 	}
 
 	endpoint := fmt.Sprintf("%s/release-group/%s?fmt=json&inc=artists+releases", c.baseURL, url.PathEscape(trimmed))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf(errRequestBuildFailed, err)
+	var payload releaseGroupResponse
+	if err := c.getJSON(ctx, endpoint, &payload); err != nil {
+		return nil, err
 	}
-	req.Header.Set(headerUserAgent, c.userAgent)
-	req.Header.Set(headerAccept, contentTypeJSON)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf(errRequestFailed, err)
-	}
-	defer resp.Body.Close()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		var payload releaseGroupResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			return nil, fmt.Errorf(errDecodeFailed, err)
-		}
-		return transformReleaseGroup(payload), nil
-	case http.StatusNotFound:
-		return nil, ErrNotFound
-	default:
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, fmt.Errorf(errUnexpectedStatus, resp.StatusCode, strings.TrimSpace(string(snippet)))
-	}
+	return transformReleaseGroup(payload), nil
 }
 
 // GetReleaseGroupTracks retrieves track listings for a release group by finding a representative release.
@@ -459,32 +429,11 @@ func (c *Client) findRepresentativeRelease(ctx context.Context, releaseGroupID s
 
 func (c *Client) fetchReleaseGroupWithReleases(ctx context.Context, releaseGroupID string) (*releaseGroupResponse, error) {
 	endpoint := fmt.Sprintf("%s/release-group/%s?fmt=json&inc=releases", c.baseURL, url.PathEscape(releaseGroupID))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf(errRequestBuildFailed, err)
+	var payload releaseGroupResponse
+	if err := c.getJSON(ctx, endpoint, &payload); err != nil {
+		return nil, err
 	}
-	req.Header.Set(headerUserAgent, c.userAgent)
-	req.Header.Set(headerAccept, contentTypeJSON)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf(errRequestFailed, err)
-	}
-	defer resp.Body.Close()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		var payload releaseGroupResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			return nil, fmt.Errorf(errDecodeFailed, err)
-		}
-		return &payload, nil
-	case http.StatusNotFound:
-		return nil, ErrNotFound
-	default:
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, fmt.Errorf(errUnexpectedStatus, resp.StatusCode, strings.TrimSpace(string(snippet)))
-	}
+	return &payload, nil
 }
 
 func (c *Client) selectBestRelease(releases []struct {
@@ -511,32 +460,11 @@ func (c *Client) selectBestRelease(releases []struct {
 // getReleaseRecordings gets the track/recording data for a specific release.
 func (c *Client) getReleaseRecordings(ctx context.Context, releaseID string) ([]Track, error) {
 	endpoint := fmt.Sprintf("%s/release/%s?fmt=json&inc=recordings", c.baseURL, url.PathEscape(releaseID))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf(errRequestBuildFailed, err)
+	var payload releaseResponse
+	if err := c.getJSON(ctx, endpoint, &payload); err != nil {
+		return nil, err
 	}
-	req.Header.Set(headerUserAgent, c.userAgent)
-	req.Header.Set(headerAccept, contentTypeJSON)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf(errRequestFailed, err)
-	}
-	defer resp.Body.Close()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		var payload releaseResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			return nil, fmt.Errorf(errDecodeFailed, err)
-		}
-		return transformReleaseTracks(payload), nil
-	case http.StatusNotFound:
-		return nil, ErrNotFound
-	default:
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, fmt.Errorf(errUnexpectedStatus, resp.StatusCode, strings.TrimSpace(string(snippet)))
-	}
+	return transformReleaseTracks(payload), nil
 }
 
 func transformReleaseGroup(payload releaseGroupResponse) *ReleaseGroup {
@@ -686,32 +614,11 @@ func (c *Client) SearchArtists(ctx context.Context, query string, limit int, off
 	params.Set("offset", strconv.Itoa(offset))
 
 	endpoint := fmt.Sprintf("%s/artist/?%s", c.baseURL, params.Encode())
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf(errRequestBuildFailed, err)
+	var payload searchResponse
+	if err := c.getJSON(ctx, endpoint, &payload); err != nil {
+		return nil, err
 	}
-	req.Header.Set(headerUserAgent, c.userAgent)
-	req.Header.Set(headerAccept, contentTypeJSON)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf(errRequestFailed, err)
-	}
-	defer resp.Body.Close()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		var payload searchResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			return nil, fmt.Errorf(errDecodeFailed, err)
-		}
-		return transformSearchResult(payload), nil
-	case http.StatusTooManyRequests:
-		return nil, ErrRateLimit
-	default:
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, fmt.Errorf(errUnexpectedStatus, resp.StatusCode, strings.TrimSpace(string(snippet)))
-	}
+	return transformSearchResult(payload), nil
 }
 
 func transformSearchResult(payload searchResponse) *SearchResult {
@@ -785,29 +692,125 @@ func (c *Client) GetArtistReleaseGroups(ctx context.Context, artistID string, li
 	params.Set("type", "album|ep") // Focus on main releases
 
 	endpoint := fmt.Sprintf("%s/release-group?artist=%s&%s", c.baseURL, url.QueryEscape(trimmed), params.Encode())
+	var payload releaseGroupSearchResponse
+	if err := c.getJSON(ctx, endpoint, &payload); err != nil {
+		return nil, err
+	}
+	return transformReleaseGroupSearchResult(payload, artistID), nil
+}
+
+func (c *Client) getJSON(ctx context.Context, endpoint string, out any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return nil, fmt.Errorf(errRequestBuildFailed, err)
+		return fmt.Errorf(errRequestBuildFailed, err)
 	}
 	req.Header.Set(headerUserAgent, c.userAgent)
 	req.Header.Set(headerAccept, contentTypeJSON)
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
-		return nil, fmt.Errorf(errRequestFailed, err)
+		return err
 	}
 	defer resp.Body.Close()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		var payload releaseGroupSearchResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			return nil, fmt.Errorf(errDecodeFailed, err)
+		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+			return fmt.Errorf(errDecodeFailed, err)
 		}
-		return transformReleaseGroupSearchResult(payload, artistID), nil
+		return nil
+	case http.StatusNotFound:
+		return ErrNotFound
+	case http.StatusTooManyRequests, http.StatusServiceUnavailable:
+		return ErrRateLimit
 	default:
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, fmt.Errorf(errUnexpectedStatus, resp.StatusCode, strings.TrimSpace(string(snippet)))
+		return fmt.Errorf(errUnexpectedStatus, resp.StatusCode, strings.TrimSpace(string(snippet)))
+	}
+}
+
+func (c *Client) do(req *http.Request) (*http.Response, error) {
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := c.waitForTurn(req.Context()); err != nil {
+			return nil, fmt.Errorf(errRequestFailed, err)
+		}
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf(errRequestFailed, err)
+		}
+		if !isRetryableStatus(resp.StatusCode) || attempt == maxAttempts {
+			return resp, nil
+		}
+
+		delay := c.retryDelay(resp.Header.Get(headerRetryAfter))
+		resp.Body.Close()
+		if err := sleepWithContext(req.Context(), delay); err != nil {
+			return nil, fmt.Errorf(errRequestFailed, err)
+		}
+	}
+
+	return nil, fmt.Errorf(errRequestFailed, errors.New("exhausted retry attempts"))
+}
+
+func (c *Client) waitForTurn(ctx context.Context) error {
+	c.mu.Lock()
+	waitUntil := c.nextRequestAt
+	now := time.Now()
+	if waitUntil.Before(now) {
+		waitUntil = now
+	}
+	c.nextRequestAt = waitUntil.Add(c.minInterval)
+	c.mu.Unlock()
+
+	wait := time.Until(waitUntil)
+	if wait <= 0 {
+		return nil
+	}
+
+	return sleepWithContext(ctx, wait)
+}
+
+func (c *Client) retryDelay(raw string) time.Duration {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return c.minInterval
+	}
+
+	if seconds, err := strconv.Atoi(trimmed); err == nil {
+		if seconds > 0 {
+			return time.Duration(seconds) * time.Second
+		}
+		return c.minInterval
+	}
+
+	if retryAt, err := http.ParseTime(trimmed); err == nil {
+		delay := time.Until(retryAt)
+		if delay > 0 {
+			return delay
+		}
+	}
+
+	return c.minInterval
+}
+
+func isRetryableStatus(statusCode int) bool {
+	return statusCode == http.StatusTooManyRequests || statusCode == http.StatusServiceUnavailable
+}
+
+func sleepWithContext(ctx context.Context, delay time.Duration) error {
+	if delay <= 0 {
+		return nil
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
 }
 

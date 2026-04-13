@@ -226,6 +226,8 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, mbClient Mu
 		switch {
 		case errors.Is(err, musicbrainz.ErrNotFound):
 			return nil, newAPIError(http.StatusNotFound, "artist not found")
+		case errors.Is(err, musicbrainz.ErrRateLimit):
+			return nil, newAPIError(http.StatusTooManyRequests, "musicbrainz rate limit exceeded, please try again shortly")
 		default:
 			return nil, newAPIError(http.StatusBadGateway, "musicbrainz lookup failed")
 		}
@@ -282,6 +284,8 @@ func getOrFetchAlbum(ctx context.Context, repo db.AlbumRepository, client MusicB
 		switch {
 		case errors.Is(err, musicbrainz.ErrNotFound):
 			return nil, newAPIError(http.StatusNotFound, "album not found")
+		case errors.Is(err, musicbrainz.ErrRateLimit):
+			return nil, newAPIError(http.StatusTooManyRequests, "musicbrainz rate limit exceeded, please try again shortly")
 		default:
 			return nil, newAPIError(http.StatusBadGateway, "musicbrainz lookup failed")
 		}

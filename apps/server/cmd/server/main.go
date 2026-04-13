@@ -42,11 +42,12 @@ func main() {
 	}()
 
 	mbClient, err := musicbrainz.New(baseCtx, musicbrainz.Config{
-		BaseURL:    cfg.MusicBrainz.BaseURL,
-		AppName:    cfg.MusicBrainz.AppName,
-		AppVersion: cfg.MusicBrainz.AppVersion,
-		Contact:    cfg.MusicBrainz.Contact,
-		Timeout:    cfg.MusicBrainz.Timeout,
+		BaseURL:     cfg.MusicBrainz.BaseURL,
+		AppName:     cfg.MusicBrainz.AppName,
+		AppVersion:  cfg.MusicBrainz.AppVersion,
+		Contact:     cfg.MusicBrainz.Contact,
+		Timeout:     cfg.MusicBrainz.Timeout,
+		MinInterval: cfg.MusicBrainz.MinInterval,
 	})
 	if err != nil {
 		log.Fatalf("musicbrainz client init failed: %v", err)
