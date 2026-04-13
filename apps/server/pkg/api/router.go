@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/adamlacasse/freq-show/apps/server/pkg/data"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/db"
@@ -375,7 +377,49 @@ func transformReleaseGroupsToAlbums(releaseGroups []musicbrainz.ReleaseGroup) []
 	return albums
 }
 
+// searchCacheEntry holds a cached search result with an expiry timestamp.
+type searchCacheEntry struct {
+	result    interface{}
+	expiresAt time.Time
+}
+
+// searchCache is a simple in-memory TTL cache for search results.
+type searchCache struct {
+	mu      sync.Mutex
+	entries map[string]searchCacheEntry
+	ttl     time.Duration
+}
+
+func newSearchCache(ttl time.Duration) *searchCache {
+	return &searchCache{
+		entries: make(map[string]searchCacheEntry),
+		ttl:     ttl,
+	}
+}
+
+func (c *searchCache) get(key string) (interface{}, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	entry, ok := c.entries[key]
+	if !ok || time.Now().After(entry.expiresAt) {
+		delete(c.entries, key)
+		return nil, false
+	}
+	return entry.result, true
+}
+
+func (c *searchCache) set(key string, result interface{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries[key] = searchCacheEntry{
+		result:    result,
+		expiresAt: time.Now().Add(c.ttl),
+	}
+}
+
 func searchHandler(client MusicBrainzClient) http.HandlerFunc {
+	cache := newSearchCache(5 * time.Minute)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !assertMethod(w, r, http.MethodGet) {
 			return
@@ -390,13 +434,25 @@ func searchHandler(client MusicBrainzClient) http.HandlerFunc {
 		limit := parseSearchLimit(r.URL.Query().Get("limit"))
 		offset := parseSearchOffset(r.URL.Query().Get("offset"))
 
+		cacheKey := strings.ToLower(strings.TrimSpace(query)) + "|" + strconv.Itoa(limit) + "|" + strconv.Itoa(offset)
+		if cached, ok := cache.get(cacheKey); ok {
+			writeJSON(w, http.StatusOK, cached)
+			return
+		}
+
 		result, err := client.SearchArtists(r.Context(), query, limit, offset)
 		if err != nil {
+			if errors.Is(err, musicbrainz.ErrRateLimit) {
+				writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "search rate limit exceeded, please try again shortly"})
+				return
+			}
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "search failed"})
 			return
 		}
 
-		writeJSON(w, http.StatusOK, normalizeSearchResultForJSON(result))
+		normalized := normalizeSearchResultForJSON(result)
+		cache.set(cacheKey, normalized)
+		writeJSON(w, http.StatusOK, normalized)
 	}
 }
 

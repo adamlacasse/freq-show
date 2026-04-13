@@ -16,7 +16,7 @@ const (
 	defaultDatabaseURL               = "file:freqshow.db?_fk=1"
 	defaultMusicBrainzBase           = "https://musicbrainz.org/ws/2"
 	defaultMusicBrainzApp            = "freq-show"
-	defaultMusicBrainzVer            = "dev"
+	defaultMusicBrainzVer            = "1.0"
 	defaultMusicBrainzContact        = "adamlacasse@outlook.com"
 	defaultMusicBrainzTimeoutSeconds = 6
 	defaultWikipediaBase             = "https://en.wikipedia.org/api/rest_v1"

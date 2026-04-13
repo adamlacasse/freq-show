@@ -33,16 +33,19 @@ export class SearchComponent implements OnDestroy {
         this.searchResults = results;
       });
 
-    // Debounce search input
+    // Debounce search input. 800ms gives MusicBrainz (~1 req/s limit) enough
+    // breathing room even if the user types steadily. Also require at least
+    // 2 characters to avoid unnecessary round-trips for single keystrokes.
     this.searchSubject
       .pipe(
-        debounceTime(300),
+        debounceTime(800),
         distinctUntilChanged(),
         takeUntil(this.destroy$)
       )
       .subscribe(query => {
-        if (query.trim()) {
-          this.performSearch(query.trim());
+        const trimmed = query.trim();
+        if (trimmed.length >= 2) {
+          this.performSearch(trimmed);
         } else {
           this.clearSearch();
         }

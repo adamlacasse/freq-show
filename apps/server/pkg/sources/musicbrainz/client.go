@@ -16,6 +16,9 @@ import (
 // ErrNotFound indicates the requested resource was not present in MusicBrainz.
 var ErrNotFound = errors.New("musicbrainz: resource not found")
 
+// ErrRateLimit indicates the MusicBrainz API has returned a 429 Too Many Requests response.
+var ErrRateLimit = errors.New("musicbrainz: rate limit exceeded")
+
 const (
 	errRequestBuildFailed = "musicbrainz: request build failed: %w"
 	errRequestFailed      = "musicbrainz: request failed: %w"
@@ -642,6 +645,8 @@ func (c *Client) SearchArtists(ctx context.Context, query string, limit int, off
 			return nil, fmt.Errorf(errDecodeFailed, err)
 		}
 		return transformSearchResult(payload), nil
+	case http.StatusTooManyRequests:
+		return nil, ErrRateLimit
 	default:
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		return nil, fmt.Errorf(errUnexpectedStatus, resp.StatusCode, strings.TrimSpace(string(snippet)))
