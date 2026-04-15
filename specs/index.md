@@ -13,5 +13,6 @@ Working practice:
 Spec Inventory:
 
 - specs/openapi.yaml — HTTP contract
+- specs/navigation-return-flows.md — authoritative frontend return-navigation behavior for search, artist, and album pages
 - Future domain specs (placeholder)
 - Future system design specs (placeholder)

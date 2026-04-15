@@ -2,19 +2,9 @@
 
 ## UI
 
-- **Remove placeholder text** — Audit all placeholder/dummy content across the UI and remove anything that doesn't reflect current functionality. The app should only describe what it actually does. This includes the "coming soon" nav links (Artists, Albums, Genres, Reviews) in the header — if these pages aren't being built imminently, the links should be removed.
+- **Contextual back navigation from album pages** — The album detail page should support richer return flows based on how the user arrived there. If an album was opened from an artist page, show a `Back to Artist` action that returns to that artist. Search return behavior should also distinguish between going back to prior search results vs. going back to an empty search screen, rather than sending every user to the same generic destination. This likely requires preserving navigation provenance and search state in the frontend.
 
-- **Reset search state on navigation** — When the user navigates away from search (e.g. hits the Home button), the search query and results should be cleared so they don't persist unexpectedly on return.
-
-- **Resolve related artists** — The artist detail page displays related artist IDs as raw strings instead of resolving them to names. These should either be fetched and displayed as clickable links, or hidden until they can be.
-
-- **Link biographies to Wikipedia source** — Artist biography sections should include a link to the underlying Wikipedia page when the biography was sourced from Wikipedia, so users can verify and continue reading from the original source.
-
-- **Add retry UI on errors** — When an API request fails, the user sees a generic message with no way to recover other than refreshing the browser. Add a "Try again" button to error states on search, artist detail, and album detail pages.
-
-- **Client-side cache for detail pages** — Artist and album detail pages re-fetch from the server on every navigation. A lightweight in-memory cache (e.g. last 20 viewed items) would make back-navigation feel instant and reduce unnecessary API calls.
-
-- **Expand frontend test coverage** — Nearly all component tests are shallow "creates successfully" stubs with no assertions on error handling, loading states, template rendering, or service interactions. The search service has one meaningful test; the artist and album services have none.
+- **Expand frontend test coverage** — Coverage is better than the initial MVP, but service-level tests are still missing for `ArtistService` and `AlbumService`, and the UI specs can go deeper on loading states, template rendering, and service interactions.
 
 ## Data / Integrations
 
