@@ -58,6 +58,11 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
+	if delay := r.URL.Query().Get("delay"); delay != "" {
+		if ms, err := strconv.Atoi(delay); err == nil {
+			time.Sleep(time.Duration(ms) * time.Millisecond)
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 

@@ -17,6 +17,13 @@
       </div>
     </header>
 
+    @if ((apiStatus.status$ | async) === 'waking') {
+      <div class="flex items-center justify-center gap-2 border-b border-freq-rose/40 bg-freq-rose/20 px-6 py-3 text-sm font-medium text-freq-rose backdrop-blur">
+        <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-freq-rose"></span>
+        Service is waking up — first request may be slow.
+      </div>
+    }
+
     <main class="flex-1">
       <router-outlet />
     </main>
