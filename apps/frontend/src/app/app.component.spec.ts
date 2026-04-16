@@ -1,8 +1,10 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { of } from 'rxjs';
 import { AppComponent } from './app.component';
 import { SearchService } from './services/search.service';
+import { ApiStatusService } from './services/api-status.service';
 
 @Component({
   standalone: true,
@@ -12,9 +14,14 @@ class DummyComponent {}
 
 describe('AppComponent', () => {
   let searchServiceSpy: jasmine.SpyObj<SearchService>;
+  let apiStatusServiceStub: Pick<ApiStatusService, 'init' | 'status$'>;
 
   beforeEach(async () => {
     searchServiceSpy = jasmine.createSpyObj<SearchService>('SearchService', ['requestSearchReset']);
+    apiStatusServiceStub = {
+      init: jasmine.createSpy('init'),
+      status$: of('ready')
+    };
 
     await TestBed.configureTestingModule({
       imports: [AppComponent],
@@ -23,7 +30,8 @@ describe('AppComponent', () => {
           { path: '', component: DummyComponent },
           { path: 'artists/:id', component: DummyComponent },
         ]),
-        { provide: SearchService, useValue: searchServiceSpy }
+        { provide: SearchService, useValue: searchServiceSpy },
+        { provide: ApiStatusService, useValue: apiStatusServiceStub }
       ],
     }).compileComponents();
   });
