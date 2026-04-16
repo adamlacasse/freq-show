@@ -83,7 +83,7 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
         : 'Back to Artist';
     }
 
-    // TODO: Model search as explicit album provenance source when direct Search -> Album navigation exists.
+    // TODO(#5): Model search as explicit album provenance source when direct Search -> Album navigation exists.
     if (this.provenance === null && hadSearchResults) {
       return 'Back to Search Results';
     }

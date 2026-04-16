@@ -130,9 +130,15 @@ export class ArtistDetailComponent implements OnInit, OnDestroy {
   }
 
   onAlbumClick(album: any): void {
+    // Guard against a click arriving before artistId is populated; writing an
+    // undefined artistId into provenance would cause the album page's back
+    // button to later navigate to /artists/undefined.
+    if (!this.artistId) {
+      return;
+    }
     this.navigationContextService.setAlbumProvenance({
       source: 'artist',
-      artistId: this.artistId!,
+      artistId: this.artistId,
       artistName: this.artist?.name ?? ''
     });
     this.router.navigate(['/albums', album.id]);
