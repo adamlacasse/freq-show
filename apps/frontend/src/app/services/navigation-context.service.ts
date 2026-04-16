@@ -6,6 +6,8 @@ export interface AlbumProvenance {
   artistName: string;
 }
 
+// TODO: Add explicit search provenance when direct Search -> Album navigation is supported.
+
 @Injectable({
   providedIn: 'root'
 })

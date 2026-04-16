@@ -32,15 +32,24 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.provenance = this.navigationContextService.getAlbumProvenance();
-    this.navigationContextService.clearAlbumProvenance();
-    const hadSearchResults = this.navigationContextService.getHadSearchResults();
-    this.navigationContextService.clearHadSearchResults();
-    this.backLabel = this.computeBackLabel(hadSearchResults);
-
     this.route.paramMap
       .pipe(takeUntil(this.destroy$))
       .subscribe(params => {
+        const freshProvenance = this.navigationContextService.getAlbumProvenance();
+        if (freshProvenance) {
+          this.provenance = freshProvenance;
+          this.navigationContextService.clearAlbumProvenance();
+        }
+
+        const hadSearchResults = this.navigationContextService.getHadSearchResults();
+        if (hadSearchResults) {
+          this.navigationContextService.clearHadSearchResults();
+        }
+
+        if (freshProvenance || hadSearchResults) {
+          this.backLabel = this.computeBackLabel(hadSearchResults);
+        }
+
         const albumId = params.get('id');
         if (albumId) {
           this.loadAlbum(albumId);
@@ -68,9 +77,13 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
   }
 
   private computeBackLabel(hadSearchResults: boolean): string {
-    if (this.provenance?.source === 'artist' && this.provenance.artistName) {
-      return 'Back to ' + this.provenance.artistName;
+    if (this.provenance?.source === 'artist') {
+      return this.provenance.artistName
+        ? 'Back to ' + this.provenance.artistName
+        : 'Back to Artist';
     }
+
+    // TODO: Model search as explicit album provenance source when direct Search -> Album navigation exists.
     if (this.provenance === null && hadSearchResults) {
       return 'Back to Search Results';
     }

@@ -183,6 +183,15 @@ describe('AlbumDetailComponent', () => {
       expect(router.navigate).toHaveBeenCalledWith(['/artists', 'artist-1']);
     });
 
+    it('shows "Back to Artist" when artist provenance is missing artist name', async () => {
+      const provenance: AlbumProvenance = { source: 'artist', artistId: 'artist-1', artistName: '' };
+      await setup(provenance, false);
+
+      const backButton = (Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[])
+        .find(b => b.textContent?.includes('Back to Artist'));
+      expect(backButton).toBeTruthy();
+    });
+
     it('shows "Back to Search Results" when no provenance but had prior search results', async () => {
       await setup(null, true);
 
@@ -198,6 +207,49 @@ describe('AlbumDetailComponent', () => {
         .find(b => b.textContent?.includes('Back to Search'));
       expect(backButton).toBeTruthy();
       expect(fixture.nativeElement.textContent).not.toContain('Back to Search Results');
+    });
+
+    it('retains artist back context across param changes when no fresh provenance is provided', async () => {
+      const provenance: AlbumProvenance = { source: 'artist', artistId: 'artist-1', artistName: 'Test Artist' };
+      await setup(provenance, false);
+      expect(fixture.componentInstance.backLabel).toBe('Back to Test Artist');
+
+      navContextService.getAlbumProvenance.and.returnValue(null);
+      navContextService.getHadSearchResults.and.returnValue(false);
+
+      routeParams$.next(convertToParamMap({ id: 'album-2' }));
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.backLabel).toBe('Back to Test Artist');
+    });
+
+    it('updates artist back context on param changes when fresh provenance is provided', async () => {
+      const initialProvenance: AlbumProvenance = {
+        source: 'artist',
+        artistId: 'artist-1',
+        artistName: 'Test Artist'
+      };
+      const updatedProvenance: AlbumProvenance = {
+        source: 'artist',
+        artistId: 'artist-2',
+        artistName: 'New Artist'
+      };
+
+      await setup(initialProvenance, false);
+      expect(fixture.componentInstance.backLabel).toBe('Back to Test Artist');
+
+      navContextService.getAlbumProvenance.and.returnValue(updatedProvenance);
+      navContextService.getHadSearchResults.and.returnValue(false);
+
+      routeParams$.next(convertToParamMap({ id: 'album-2' }));
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.backLabel).toBe('Back to New Artist');
+
+      const router = TestBed.inject(Router);
+      spyOn(router, 'navigate');
+      fixture.componentInstance.goBack();
+      expect(router.navigate).toHaveBeenCalledWith(['/artists', 'artist-2']);
     });
   });
 });

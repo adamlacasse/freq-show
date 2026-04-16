@@ -21,6 +21,7 @@ export class SearchComponent implements OnDestroy, OnInit {
   searchResults: SearchResult | null = null;
   searchError: string | null = null;
   isSearching = false;
+  private lastExecutedQuery = '';
   private destroy$ = new Subject<void>();
   private searchSubject = new Subject<string>();
 
@@ -74,6 +75,7 @@ export class SearchComponent implements OnDestroy, OnInit {
   }
 
   performSearch(query: string): void {
+    this.lastExecutedQuery = query;
     this.isSearching = true;
     this.searchError = null;
     this.searchService.searchArtists({
@@ -148,7 +150,7 @@ export class SearchComponent implements OnDestroy, OnInit {
   }
 
   onArtistClick(artist: Artist): void {
-    this.navigationContextService.saveSearchQuery(this.searchQuery);
+    this.navigationContextService.saveSearchQuery(this.lastExecutedQuery);
     this.navigationContextService.recordSearchResults(
       !!(this.searchResults && this.searchResults.artists.length > 0)
     );
@@ -159,6 +161,7 @@ export class SearchComponent implements OnDestroy, OnInit {
     const savedQuery = this.navigationContextService.getSavedSearchQuery();
     if (savedQuery) {
       this.searchQuery = savedQuery;
+      this.lastExecutedQuery = savedQuery;
       this.performSearch(savedQuery);
       this.navigationContextService.clearSavedSearchQuery();
     }
