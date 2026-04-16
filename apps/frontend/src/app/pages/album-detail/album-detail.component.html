@@ -27,7 +27,7 @@
       (click)="goBack()"
       class="rounded-full border border-white/20 bg-white/5 px-6 py-2 font-medium text-freq-cream transition hover:border-white/40 hover:bg-white/10"
     >
-      ← Back to Search
+      ← {{ backLabel }}
     </button>
     </div>
   </div>
@@ -43,7 +43,7 @@
     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
     </svg>
-    Back to Search
+    {{ backLabel }}
   </button>
 
   <!-- Album Header -->

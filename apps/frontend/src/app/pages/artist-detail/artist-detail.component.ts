@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Observable, Subject, Subscription, takeUntil } from 'rxjs';
 import { ArtistService } from '../../services/artist.service';
+import { NavigationContextService } from '../../services/navigation-context.service';
 import type { components } from '../../models/openapi-types.generated';
 
 type BaseArtist = components['schemas']['Artist'];
@@ -35,7 +36,8 @@ export class ArtistDetailComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private artistService: ArtistService
+    private artistService: ArtistService,
+    private navigationContextService: NavigationContextService
   ) {}
 
   ngOnInit(): void {
@@ -128,6 +130,17 @@ export class ArtistDetailComponent implements OnInit, OnDestroy {
   }
 
   onAlbumClick(album: any): void {
+    // Guard against a click arriving before artistId is populated; writing an
+    // undefined artistId into provenance would cause the album page's back
+    // button to later navigate to /artists/undefined.
+    if (!this.artistId) {
+      return;
+    }
+    this.navigationContextService.setAlbumProvenance({
+      source: 'artist',
+      artistId: this.artistId,
+      artistName: this.artist?.name ?? ''
+    });
     this.router.navigate(['/albums', album.id]);
   }
 

@@ -1,9 +1,10 @@
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject, takeUntil, debounceTime, distinctUntilChanged } from 'rxjs';
 import { SearchService } from '../../services/search.service';
+import { NavigationContextService } from '../../services/navigation-context.service';
 import type { components } from '../../models/openapi-types.generated';
 
 type SearchResult = components['schemas']['SearchResult'];
@@ -15,17 +16,19 @@ type Artist = components['schemas']['SearchArtist'];
     templateUrl: './search.component.html',
     styleUrls: ['./search.component.css']
 })
-export class SearchComponent implements OnDestroy {
+export class SearchComponent implements OnDestroy, OnInit {
   searchQuery = '';
   searchResults: SearchResult | null = null;
   searchError: string | null = null;
   isSearching = false;
+  private lastExecutedQuery = '';
   private destroy$ = new Subject<void>();
   private searchSubject = new Subject<string>();
 
   constructor(
     private searchService: SearchService,
-    private router: Router
+    private router: Router,
+    private navigationContextService: NavigationContextService
   ) {
     // Subscribe to search results
     this.searchService.searchResults$
@@ -72,6 +75,7 @@ export class SearchComponent implements OnDestroy {
   }
 
   performSearch(query: string): void {
+    this.lastExecutedQuery = query;
     this.isSearching = true;
     this.searchError = null;
     this.searchService.searchArtists({
@@ -146,7 +150,21 @@ export class SearchComponent implements OnDestroy {
   }
 
   onArtistClick(artist: Artist): void {
+    this.navigationContextService.saveSearchQuery(this.lastExecutedQuery);
+    this.navigationContextService.recordSearchResults(
+      !!(this.searchResults && this.searchResults.artists.length > 0)
+    );
     this.router.navigate(['/artists', artist.id]);
+  }
+
+  ngOnInit(): void {
+    const savedQuery = this.navigationContextService.getSavedSearchQuery();
+    if (savedQuery) {
+      this.searchQuery = savedQuery;
+      this.lastExecutedQuery = savedQuery;
+      this.performSearch(savedQuery);
+      this.navigationContextService.clearSavedSearchQuery();
+    }
   }
 
   ngOnDestroy(): void {

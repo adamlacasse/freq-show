@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, Subscription, takeUntil } from 'rxjs';
 import { AlbumService } from '../../services/album.service';
+import { NavigationContextService, AlbumProvenance } from '../../services/navigation-context.service';
 import type { components } from '../../models/openapi-types.generated';
 
 type Album = components['schemas']['Album'];
@@ -17,6 +18,8 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
   album: Album | null = null;
   isLoading = false;
   error: string | null = null;
+  provenance: AlbumProvenance | null = null;
+  backLabel = 'Back to Search';
   private albumId: string | null = null;
   private activeLoad?: Subscription;
   private destroy$ = new Subject<void>();
@@ -24,13 +27,29 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private albumService: AlbumService
+    private albumService: AlbumService,
+    private navigationContextService: NavigationContextService
   ) {}
 
   ngOnInit(): void {
     this.route.paramMap
       .pipe(takeUntil(this.destroy$))
       .subscribe(params => {
+        const freshProvenance = this.navigationContextService.getAlbumProvenance();
+        if (freshProvenance) {
+          this.provenance = freshProvenance;
+          this.navigationContextService.clearAlbumProvenance();
+        }
+
+        const hadSearchResults = this.navigationContextService.getHadSearchResults();
+        if (hadSearchResults) {
+          this.navigationContextService.clearHadSearchResults();
+        }
+
+        if (freshProvenance || hadSearchResults) {
+          this.backLabel = this.computeBackLabel(hadSearchResults);
+        }
+
         const albumId = params.get('id');
         if (albumId) {
           this.loadAlbum(albumId);
@@ -50,7 +69,25 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
   }
 
   goBack(): void {
+    if (this.provenance?.source === 'artist') {
+      this.router.navigate(['/artists', this.provenance.artistId]);
+      return;
+    }
     this.router.navigate(['/']);
+  }
+
+  private computeBackLabel(hadSearchResults: boolean): string {
+    if (this.provenance?.source === 'artist') {
+      return this.provenance.artistName
+        ? 'Back to ' + this.provenance.artistName
+        : 'Back to Artist';
+    }
+
+    // TODO(#5): Model search as explicit album provenance source when direct Search -> Album navigation exists.
+    if (this.provenance === null && hadSearchResults) {
+      return 'Back to Search Results';
+    }
+    return 'Back to Search';
   }
 
   retry(): void {
