@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, Subscription, takeUntil } from 'rxjs';
 import { AlbumService } from '../../services/album.service';
+import { NavigationContextService, AlbumProvenance } from '../../services/navigation-context.service';
 import type { components } from '../../models/openapi-types.generated';
 
 type Album = components['schemas']['Album'];
@@ -17,6 +18,8 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
   album: Album | null = null;
   isLoading = false;
   error: string | null = null;
+  provenance: AlbumProvenance | null = null;
+  backLabel = 'Back to Search';
   private albumId: string | null = null;
   private activeLoad?: Subscription;
   private destroy$ = new Subject<void>();
@@ -24,10 +27,17 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private albumService: AlbumService
+    private albumService: AlbumService,
+    private navigationContextService: NavigationContextService
   ) {}
 
   ngOnInit(): void {
+    this.provenance = this.navigationContextService.getAlbumProvenance();
+    this.navigationContextService.clearAlbumProvenance();
+    const hadSearchResults = this.navigationContextService.getHadSearchResults();
+    this.navigationContextService.clearHadSearchResults();
+    this.backLabel = this.computeBackLabel(hadSearchResults);
+
     this.route.paramMap
       .pipe(takeUntil(this.destroy$))
       .subscribe(params => {
@@ -50,7 +60,21 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
   }
 
   goBack(): void {
+    if (this.provenance?.source === 'artist') {
+      this.router.navigate(['/artists', this.provenance.artistId]);
+      return;
+    }
     this.router.navigate(['/']);
+  }
+
+  private computeBackLabel(hadSearchResults: boolean): string {
+    if (this.provenance?.source === 'artist' && this.provenance.artistName) {
+      return 'Back to ' + this.provenance.artistName;
+    }
+    if (this.provenance === null && hadSearchResults) {
+      return 'Back to Search Results';
+    }
+    return 'Back to Search';
   }
 
   retry(): void {
