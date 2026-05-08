@@ -1,0 +1,674 @@
+[
+  {
+    "id": "radiohead-in-rainbows-2007",
+    "title": "In Rainbows",
+    "artist": "Radiohead",
+    "year": 2007,
+    "genre": "art rock",
+    "review_summary": "A pivot from the band's heaviest electronic experiments back toward warmth and melody, with emotionally direct songwriting and inventive arrangements that reward repeat listening.",
+    "tracks": [
+      "15 Step",
+      "Bodysnatchers",
+      "Nude",
+      "Weird Fishes/Arpeggi",
+      "All I Need",
+      "Faust Arp",
+      "Reckoner",
+      "House of Cards",
+      "Jigsaw Falling Into Place",
+      "Videotape"
+    ]
+  },
+  {
+    "id": "miles-davis-kind-of-blue-1959",
+    "title": "Kind of Blue",
+    "artist": "Miles Davis",
+    "year": 1959,
+    "genre": "modal jazz",
+    "review_summary": "The most influential jazz album ever recorded — modal, spacious, conversational, with a sextet of generational players trading ideas at conversational volume. Cool but never cold.",
+    "tracks": [
+      "So What",
+      "Freddie Freeloader",
+      "Blue in Green",
+      "All Blues",
+      "Flamenco Sketches"
+    ]
+  },
+  {
+    "id": "aphex-twin-saw1-1992",
+    "title": "Selected Ambient Works 85-92",
+    "artist": "Aphex Twin",
+    "year": 1992,
+    "genre": "ambient electronic",
+    "review_summary": "Bedroom-produced ambient techno that's hypnotic and melodic without being pretty — analog warmth shot through with melancholy, structure that sneaks up on you over a track's length.",
+    "tracks": [
+      "Xtal",
+      "Tha",
+      "Pulsewidth",
+      "Ageispolis",
+      "i",
+      "Green Calx",
+      "Heliosphan",
+      "We Are the Music Makers",
+      "Schottkey 7th Path",
+      "Ptolemy",
+      "Hedphelym",
+      "Delphium",
+      "Actium"
+    ]
+  },
+  {
+    "id": "public-enemy-nation-1988",
+    "title": "It Takes a Nation of Millions to Hold Us Back",
+    "artist": "Public Enemy",
+    "year": 1988,
+    "genre": "hip-hop",
+    "review_summary": "Dense, abrasive, politically charged hip-hop built on the Bomb Squad's wall-of-sample production. Chuck D's voice is a battering ram; Flavor Flav is the chaos agent. Few albums have this much momentum.",
+    "tracks": [
+      "Countdown to Armageddon",
+      "Bring the Noise",
+      "Don't Believe the Hype",
+      "Cold Lampin' with Flavor",
+      "Terminator X to the Edge of Panic",
+      "Mind Terrorist",
+      "Louder Than a Bomb",
+      "Caught, Can We Get a Witness?",
+      "Show 'Em Whatcha Got",
+      "She Watch Channel Zero?!",
+      "Night of the Living Baseheads",
+      "Black Steel in the Hour of Chaos",
+      "Security of the First World",
+      "Rebel Without a Pause",
+      "Prophets of Rage",
+      "Party for Your Right to Fight"
+    ]
+  },
+  {
+    "id": "joni-mitchell-blue-1971",
+    "title": "Blue",
+    "artist": "Joni Mitchell",
+    "year": 1971,
+    "genre": "folk",
+    "review_summary": "A confessional songwriter peak — sparse arrangements (often just voice and piano or dulcimer) carrying lyrics that reveal more on every listen. Vulnerable and precise in equal measure.",
+    "tracks": [
+      "All I Want",
+      "My Old Man",
+      "Little Green",
+      "Carey",
+      "Blue",
+      "California",
+      "This Flight Tonight",
+      "River",
+      "A Case of You",
+      "The Last Time I Saw Richard"
+    ]
+  },
+  {
+    "id": "daft-punk-discovery-2001",
+    "title": "Discovery",
+    "artist": "Daft Punk",
+    "year": 2001,
+    "genre": "house",
+    "review_summary": "A maximalist French house record built from chopped disco and soft-rock samples, with a vocoder-led emotional core that shouldn't work and absolutely does. The album that taught a generation what a hook is.",
+    "tracks": [
+      "One More Time",
+      "Aerodynamic",
+      "Digital Love",
+      "Harder Better Faster Stronger",
+      "Crescendolls",
+      "Nightvision",
+      "Superheroes",
+      "High Life",
+      "Something About Us",
+      "Voyager",
+      "Veridis Quo",
+      "Short Circuit",
+      "Face to Face",
+      "Too Long"
+    ]
+  },
+  {
+    "id": "black-sabbath-paranoid-1970",
+    "title": "Paranoid",
+    "artist": "Black Sabbath",
+    "year": 1970,
+    "genre": "heavy metal",
+    "review_summary": "The blueprint for metal: down-tuned riffs, doom-laden lyrics, and a rhythm section that swings harder than the genre would later remember. War Pigs is six and a half minutes of foundation.",
+    "tracks": [
+      "War Pigs",
+      "Paranoid",
+      "Planet Caravan",
+      "Iron Man",
+      "Electric Funeral",
+      "Hand of Doom",
+      "Rat Salad",
+      "Fairies Wear Boots"
+    ]
+  },
+  {
+    "id": "marvin-gaye-whats-going-on-1971",
+    "title": "What's Going On",
+    "artist": "Marvin Gaye",
+    "year": 1971,
+    "genre": "soul",
+    "review_summary": "A song-cycle about war, poverty, and ecology dressed in the most beautiful soul production of its era. Strings, congas, layered vocals, and a writer at the height of his craft saying things Motown didn't want to release.",
+    "tracks": [
+      "What's Going On",
+      "What's Happening Brother",
+      "Flyin' High (In the Friendly Sky)",
+      "Save the Children",
+      "God Is Love",
+      "Mercy Mercy Me (The Ecology)",
+      "Right On",
+      "Wholy Holy",
+      "Inner City Blues (Make Me Wanna Holler)"
+    ]
+  },
+  {
+    "id": "mogwai-young-team-1997",
+    "title": "Young Team",
+    "artist": "Mogwai",
+    "year": 1997,
+    "genre": "post-rock",
+    "review_summary": "Loud-quiet-loud guitar instrumentals stretched to album length, with a Glasgow-specific bleakness underneath the noise. Mostly wordless, occasionally devastating.",
+    "tracks": [
+      "Yes! I Am a Long Way from Home",
+      "Like Herod",
+      "Katrien",
+      "Radar Maker",
+      "Tracy",
+      "Summer",
+      "With Portfolio",
+      "R U Still in 2 It",
+      "A Cheery Wave from Stranded Youngsters",
+      "Mogwai Fear Satan"
+    ]
+  },
+  {
+    "id": "bjork-vespertine-2001",
+    "title": "Vespertine",
+    "artist": "Björk",
+    "year": 2001,
+    "genre": "art pop",
+    "review_summary": "An intimate album made for headphones — micro-beats stitched from clicks and music boxes, hushed vocals, harp, and a winter-morning hush throughout. Domestic and otherworldly at once.",
+    "tracks": [
+      "Hidden Place",
+      "Cocoon",
+      "It's Not Up to You",
+      "Undo",
+      "Pagan Poetry",
+      "Frosti",
+      "Aurora",
+      "An Echo, A Stain",
+      "Sun in My Mouth",
+      "Heirloom",
+      "Harm of Will",
+      "Unison"
+    ]
+  },
+  {
+    "id": "kendrick-lamar-tpab-2015",
+    "title": "To Pimp a Butterfly",
+    "artist": "Kendrick Lamar",
+    "year": 2015,
+    "genre": "hip-hop",
+    "review_summary": "A jazz-inflected, politically dense hip-hop opus with a live-band feel and a recurring spoken-word thread. Long, demanding, and one of the few rap albums that genuinely earns the word 'symphonic'.",
+    "tracks": [
+      "Wesley's Theory",
+      "For Free? (Interlude)",
+      "King Kunta",
+      "Institutionalized",
+      "These Walls",
+      "u",
+      "Alright",
+      "For Sale? (Interlude)",
+      "Momma",
+      "Hood Politics",
+      "How Much a Dollar Cost",
+      "Complexion (A Zulu Love)",
+      "The Blacker the Berry",
+      "You Ain't Gotta Lie (Momma Said)",
+      "i",
+      "Mortal Man"
+    ]
+  },
+  {
+    "id": "sufjan-stevens-carrie-lowell-2015",
+    "title": "Carrie & Lowell",
+    "artist": "Sufjan Stevens",
+    "year": 2015,
+    "genre": "folk",
+    "review_summary": "A quiet album about grief, written after the death of the songwriter's estranged mother. Mostly fingerpicked guitar and breath-close vocals, with electronic textures that drift in and out like memory.",
+    "tracks": [
+      "Death with Dignity",
+      "Should Have Known Better",
+      "All of Me Wants All of You",
+      "Drawn to the Blood",
+      "Eugene",
+      "Fourth of July",
+      "The Only Thing",
+      "Carrie & Lowell",
+      "John My Beloved",
+      "No Shade in the Shadow of the Cross",
+      "Blue Bucket of Gold"
+    ]
+  },
+  {
+    "id": "jimi-hendrix-are-you-experienced-1967",
+    "title": "Are You Experienced",
+    "artist": "Jimi Hendrix",
+    "year": 1967,
+    "genre": "psychedelic rock",
+    "review_summary": "Debut-album-level detonation: blues roots stretched into psychedelic color, fuzz guitar as lead voice, and a rhythm section loose enough to follow every left turn.",
+    "tracks": [
+      "Purple Haze",
+      "Manic Depression",
+      "Hey Joe",
+      "Love or Confusion",
+      "May This Be Love",
+      "I Don't Live Today",
+      "The Wind Cries Mary",
+      "Fire",
+      "Third Stone from the Sun",
+      "Foxey Lady",
+      "Are You Experienced?"
+    ]
+  },
+  {
+    "id": "jimi-hendrix-axis-bold-as-love-1967",
+    "title": "Axis: Bold as Love",
+    "artist": "Jimi Hendrix",
+    "year": 1967,
+    "genre": "psychedelic rock",
+    "review_summary": "More song-focused and colorful than the debut, with Hendrix leaning into chord voicings, studio panning tricks, and a wider emotional palette without losing the fire.",
+    "tracks": [
+      "EXP",
+      "Up from the Skies",
+      "Spanish Castle Magic",
+      "Wait Until Tomorrow",
+      "Ain't No Telling",
+      "Little Wing",
+      "If 6 Was 9",
+      "You Got Me Floatin'",
+      "Castles Made of Sand",
+      "She's So Fine",
+      "One Rainy Wish",
+      "Little Miss Lover",
+      "Bold as Love"
+    ]
+  },
+  {
+    "id": "jimi-hendrix-electric-ladyland-1968",
+    "title": "Electric Ladyland",
+    "artist": "Jimi Hendrix",
+    "year": 1968,
+    "genre": "psychedelic rock",
+    "review_summary": "A sprawling studio laboratory where blues, psychedelia, and soul all get fed through Hendrix's production brain; jams stretch out, but the detail work rewards close listening.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "jimi-hendrix-band-of-gypsys-1970",
+    "title": "Band of Gypsys",
+    "artist": "Jimi Hendrix",
+    "year": 1970,
+    "genre": "funk rock",
+    "review_summary": "Live Hendrix pivoting toward funk and groove with a new rhythm section, stretching riffs into long-form improvisations that feel both looser and more locked-in.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "beatles-rubber-soul-1965",
+    "title": "Rubber Soul",
+    "artist": "The Beatles",
+    "year": 1965,
+    "genre": "rock",
+    "review_summary": "The pivot from beat-band singles to album-as-statement: richer chords, more acoustic textures, and lyrics that reach past boy-meets-girl without losing immediacy.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "beatles-revolver-1966",
+    "title": "Revolver",
+    "artist": "The Beatles",
+    "year": 1966,
+    "genre": "rock",
+    "review_summary": "Tight, psychedelic, and experimental in three-minute song form—string quartets, studio loops, and altered states smuggled into pop format.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "beatles-sgt-pepper-1967",
+    "title": "Sgt. Pepper's Lonely Hearts Club Band",
+    "artist": "The Beatles",
+    "year": 1967,
+    "genre": "psychedelic rock",
+    "review_summary": "The canonical concept-LP moment: studio as theater, orchestral color everywhere, and a continuous flow that defined ‘album era’ pop.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "beatles-white-album-1968",
+    "title": "The Beatles (White Album)",
+    "artist": "The Beatles",
+    "year": 1968,
+    "genre": "rock",
+    "review_summary": "A messy double album that functions like four solo careers colliding—folk, proto-metal, music hall, tape collage—somehow cohering into one of rock's strangest masterpieces.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "beatles-abbey-road-1969",
+    "title": "Abbey Road",
+    "artist": "The Beatles",
+    "year": 1969,
+    "genre": "rock",
+    "review_summary": "Pristine late-period studio sheen, with side two’s medley turning song fragments into a seamless suite and the band sounding more polished than ever.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "rolling-stones-beggars-banquet-1968",
+    "title": "Beggars Banquet",
+    "artist": "The Rolling Stones",
+    "year": 1968,
+    "genre": "rock",
+    "review_summary": "A return to roots with a darker edge—country, blues, and gospel flavors backing lyrics that feel more cynical and world-weary than their mid‑60s hits.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "rolling-stones-let-it-bleed-1969",
+    "title": "Let It Bleed",
+    "artist": "The Rolling Stones",
+    "year": 1969,
+    "genre": "rock",
+    "review_summary": "End-of-the-60s decadence pressed into vinyl—longer songs, country-blues swagger, and a sense of apocalypse lurking under the party.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "rolling-stones-sticky-fingers-1971",
+    "title": "Sticky Fingers",
+    "artist": "The Rolling Stones",
+    "year": 1971,
+    "genre": "rock",
+    "review_summary": "Studio-slick but still sleazy, with the band embracing soul horns, acoustic ballads, and thick guitar tones without losing their bar-band core.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "rolling-stones-exile-on-main-st-1972",
+    "title": "Exile on Main St.",
+    "artist": "The Rolling Stones",
+    "year": 1972,
+    "genre": "rock",
+    "review_summary": "A humid, double-LP sprawl of rock, country, gospel, and R&B—all murk, groove, and half-buried hooks that slowly crawl into your bloodstream.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "rolling-stones-goats-head-soup-1973",
+    "title": "Goats Head Soup",
+    "artist": "The Rolling Stones",
+    "year": 1973,
+    "genre": "rock",
+    "review_summary": "Post-Exile comedown: hazier tempos, more ballads, and a sense of glamorous exhaustion that still hides some sharp songwriting.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "radiohead-the-bends-1995",
+    "title": "The Bends",
+    "artist": "Radiohead",
+    "year": 1995,
+    "genre": "alternative rock",
+    "review_summary": "Guitar-driven, emotionally widescreen 90s rock: big choruses, harmonic left turns, and enough textural curiosity to hint at their future without leaving britpop-adjacent territory.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "radiohead-ok-computer-1997",
+    "title": "OK Computer",
+    "artist": "Radiohead",
+    "year": 1997,
+    "genre": "art rock",
+    "review_summary": "A dystopian, meticulously arranged step beyond britpop—layered guitars, alien electronics, and song structures that twist while still hitting like anthems.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "radiohead-kid-a-2000",
+    "title": "Kid A",
+    "artist": "Radiohead",
+    "year": 2000,
+    "genre": "art rock",
+    "review_summary": "Rock band dissolves into texture: modular synths, jazz horns, abstract rhythm programming, and Thom Yorke's voice as one more instrument in the fog.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "parliament-mothership-connection-1975",
+    "title": "Mothership Connection",
+    "artist": "Parliament",
+    "year": 1975,
+    "genre": "funk",
+    "review_summary": "P-Funk’s sci-fi parliament in full session: rubber-band bass, horn hooks for days, and a concept loose enough to just be an excuse to party.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "parliament-funkentelechy-1977",
+    "title": "Funkentelechy vs. the Placebo Syndrome",
+    "artist": "Parliament",
+    "year": 1977,
+    "genre": "funk",
+    "review_summary": "Longer grooves, more narrative, and a fully weaponized band tearing through extended funk jams without ever losing the hook.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "funkadelic-maggot-brain-1971",
+    "title": "Maggot Brain",
+    "artist": "Funkadelic",
+    "year": 1971,
+    "genre": "psychedelic funk",
+    "review_summary": "Opening with a ten-minute guitar eulogy, then veering into gritty funk and rock, it’s both raw and cosmic—one of the heaviest fusions of soul and psychedelia.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "funkadelic-one-nation-under-a-groove-1978",
+    "title": "One Nation Under a Groove",
+    "artist": "Funkadelic",
+    "year": 1978,
+    "genre": "funk",
+    "review_summary": "More polished and unified than early Funkadelic, with anthemic choruses riding on top of deep-pocket grooves and guitars that still bite.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "sly-and-the-family-stone-stand-1969",
+    "title": "Stand!",
+    "artist": "Sly & The Family Stone",
+    "year": 1969,
+    "genre": "funk",
+    "review_summary": "Utopian soul-funk with rock volume: socially conscious lyrics, jubilant horns, and rhythm-section interplay that basically invents 70s funk.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "sly-and-the-family-stone-riot-1971",
+    "title": "There's a Riot Goin' On",
+    "artist": "Sly & The Family Stone",
+    "year": 1971,
+    "genre": "funk",
+    "review_summary": "Murky, claustrophobic, and exhausted: drum machines, tape hiss, and a sense that the utopian 60s have curdled—but the grooves are still undeniable.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "sly-and-the-family-stone-fresh-1973",
+    "title": "Fresh",
+    "artist": "Sly & The Family Stone",
+    "year": 1973,
+    "genre": "funk",
+    "review_summary": "A cleaner, more upbeat refinement after Riot—tight funk arrangements, sharp basslines, and lyrics that balance joy and melancholy.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "led-zeppelin-ii-1969",
+    "title": "Led Zeppelin II",
+    "artist": "Led Zeppelin",
+    "year": 1969,
+    "genre": "hard rock",
+    "review_summary": "The template for big-riff hard rock: blues roots turned up to stadium volume, with drum and bass interplay that hits like a wrecking ball.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "led-zeppelin-iv-1971",
+    "title": "Led Zeppelin IV",
+    "artist": "Led Zeppelin",
+    "year": 1971,
+    "genre": "hard rock",
+    "review_summary": "Overplayed for a reason—folk, metal, and mysticism collide in a tight set that shows every side of the band at peak power.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "led-zeppelin-houses-of-the-holy-1973",
+    "title": "Houses of the Holy",
+    "artist": "Led Zeppelin",
+    "year": 1973,
+    "genre": "rock",
+    "review_summary": "Playful and stylistically restless, from reggae-inflected experiments to proggy epics—less blues, more world-building.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "led-zeppelin-physical-graffiti-1975",
+    "title": "Physical Graffiti",
+    "artist": "Led Zeppelin",
+    "year": 1975,
+    "genre": "rock",
+    "review_summary": "A sprawling, mature double album where the band folds everything they can do—riff monsters, acoustic miniatures, epics—into a single statement.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "aerosmith-toys-in-the-attic-1975",
+    "title": "Toys in the Attic",
+    "artist": "Aerosmith",
+    "year": 1975,
+    "genre": "hard rock",
+    "review_summary": "70s hard rock swagger with just enough swing: riffy, dirty, and catchy, sitting right between bar band scruff and arena ambition.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "aerosmith-rocks-1976",
+    "title": "Rocks",
+    "artist": "Aerosmith",
+    "year": 1976,
+    "genre": "hard rock",
+    "review_summary": "A leaner, punchier follow-up that doubles down on the guitars and keeps the tempos high; the purest distillation of their 70s power.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "deep-purple-in-rock-1970",
+    "title": "Deep Purple in Rock",
+    "artist": "Deep Purple",
+    "year": 1970,
+    "genre": "hard rock",
+    "review_summary": "Organ and guitar locked in mortal combat over proto-metal riffs, with operatic vocals perched on top—loud, fast, and slightly unhinged.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "deep-purple-machine-head-1972",
+    "title": "Machine Head",
+    "artist": "Deep Purple",
+    "year": 1972,
+    "genre": "hard rock",
+    "review_summary": "Tighter songwriting and studio sound without losing the jam-band heart; home to some of hard rock’s most imitated riffs.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "boston-boston-1976",
+    "title": "Boston",
+    "artist": "Boston",
+    "year": 1976,
+    "genre": "rock",
+    "review_summary": "Guitar overdub nirvana: radio-perfect hooks, stacked harmonies, and a polished sound that still somehow feels like a band.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "steely-dan-pretzel-logic-1974",
+    "title": "Pretzel Logic",
+    "artist": "Steely Dan",
+    "year": 1974,
+    "genre": "jazz rock",
+    "review_summary": "Short, hooky songs hiding harmonic rabbit holes; the moment Steely Dan fully becomes a studio-first songwriting lab.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "steely-dan-royal-scam-1976",
+    "title": "The Royal Scam",
+    "artist": "Steely Dan",
+    "year": 1976,
+    "genre": "jazz rock",
+    "review_summary": "Darker and more guitar-forward, with snarling lyrics over jazz-informed chord changes and absurdly tight playing.",
+    "tracks": [
+      "…"
+    ]
+  },
+  {
+    "id": "steely-dan-aja-1977",
+    "title": "Aja",
+    "artist": "Steely Dan",
+    "year": 1977,
+    "genre": "jazz rock",
+    "review_summary": "Pristine, almost impossibly controlled jazz-rock with lush arrangements; every drum hit and chord voicing feels hand-placed.",
+    "tracks": [
+      "…"
+    ]
+  }
+]

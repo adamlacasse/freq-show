@@ -1,0 +1,72 @@
+[
+  {
+    "id": "radiohead-textural",
+    "query": "I love Radiohead's In Rainbows but want something less melancholy, more textural — instrumental preferred. Maybe something with electronic elements but organic-feeling.",
+    "expected_vibe": "Textural, instrumental-leaning art rock or warm electronic. Aphex Twin SAW1 should rank well; Mogwai plausibly. Radiohead itself should NOT appear (the user already named it). Anything vocal-driven or aggressive is wrong."
+  },
+  {
+    "id": "saturday-jazz",
+    "query": "Saturday morning coffee, jazzy but modern, nothing harsh. Something I can read the paper to.",
+    "expected_vibe": "Modern jazz or jazz-adjacent records that read as gentle. Kind of Blue is the obvious classic answer; To Pimp a Butterfly has the jazz lineage but it's NOT Saturday-morning music — would be a tell of weak retrieval if it ranks 1."
+  },
+  {
+    "id": "late-night-electronic",
+    "query": "Late-night drive music, hypnotic and electronic, no lyrics if possible.",
+    "expected_vibe": "Aphex Twin SAW1 is the bullseye. Daft Punk Discovery is electronic but too poppy/danceable for late-night-drive — should not be top-1. Anything vocal-heavy is wrong."
+  },
+  {
+    "id": "deep-cut-soul",
+    "query": "I want classic 70s soul but the deeper cuts. I already know Marvin Gaye and Stevie Wonder.",
+    "expected_vibe": "What's Going On is a Marvin Gaye record so it should NOT appear (the user named the artist). The corpus is thin on soul outside Marvin Gaye, so the model may need to reach — interesting test of how it handles a cold-start genre. Reasonable to surface adjacent picks (jazz, funk)."
+  },
+  {
+    "id": "surprise-me",
+    "query": "Surprise me — something completely outside what I'd usually pick. I usually listen to mainstream rock.",
+    "expected_vibe": "Discovery mode. Less canonical picks should rank higher. Anything from the corpus could be defensible here; the test is whether the model surfaces things genuinely unlike mainstream rock vs. just picking the closest rock-adjacent record."
+  },
+  {
+    "id": "heavy-and-slow",
+    "query": "Heavy and slow, doom-y but not metal exactly.",
+    "expected_vibe": "Black Sabbath Paranoid is metal so it's a borderline match — the 'not metal exactly' qualifier should ideally pull it down a slot. Mogwai's Young Team has the loud-slow thing without being metal. A model that ignores the 'not metal' qualifier and picks Sabbath at #1 has weaker semantic understanding."
+  },
+  {
+    "id": "electric-ladyland-maggot-brain",
+    "query": "Stuff that lives between Electric Ladyland and Maggot Brain.",
+    "expected_vibe": "Psychedelic, guitar-forward, expansive jams; heavy but not metal; emphasis on solos, atmosphere, and long-form grooves rather than tight pop song forms. Lean toward psychedelic funk, acid rock, and extended jam pieces rather than concise radio singles."
+  },
+  {
+    "id": "aja-produced-rock",
+    "query": "Rock records that are as meticulously produced as Aja but still have teeth.",
+    "expected_vibe": "Rock or jazz-rock albums with immaculate production, sophisticated harmony, and groove, but with some grit or edge left—no completely smoothed-over adult-contemporary sheen. Think studio-obsessive bandleaders and session-player precision that still feels like a rock record."
+  },
+  {
+    "id": "funk-political-bounce",
+    "query": "70s funk with the political edge of There's a Riot Goin' On and the bounce of Parliament.",
+    "expected_vibe": "Early-to-mid 70s funk and soul with strong grooves and danceable bounce, but lyrically darker, socially aware, or politically charged. Sonically somewhere between the murky, tape-saturated feel of Riot and the bright party energy of Parliament; absolutely funk, not full-on disco."
+  },
+  {
+    "id": "beatles-fool-guitar-crunch",
+    "query": "Give me some songs that sound like the Beatles 'Fool on the Hill', but with more guitar crunch.",
+    "expected_vibe": "Melodic, somewhat pastoral or lightly psychedelic rock/pop with rich harmony and arrangements like late-60s Beatles, but with more prominent electric guitar tone. Tuneful and song-centric rather than metal or heavy riff rock; think color and chords first, then a bit more bite."
+  },
+  {
+    "id": "zeppelin-mature-albums",
+    "query": "While I grew up with Led Zeppelin's first few albums, as I've aged I've grown increasingly fond of Physical Graffiti. What are some other 'mature' albums from veteran rock bands?",
+    "expected_vibe": "Later-career albums by rock bands who already have several records behind them, where they broaden their palette and sound more assured and varied. Sprawling or multi-style records that feel like a culmination rather than a debut burst; still rock, not a soft adult-contemporary pivot."
+  },
+  {
+    "id": "funk-not-disco",
+    "query": "There's a thin line between funk and disco. Do not cross that line.",
+    "expected_vibe": "70s funk with strong groove, syncopation, and bass presence that may brush up against disco-adjacent sounds but never tips into straight four-on-the-floor, glossy strings, or overt disco tropes. Live-band feel prioritized over slick, mirror-ball polish."
+  },
+  {
+    "id": "90s-radiohead-between-genres",
+    "query": "Rock albums that, like mid-90s Radiohead, sit between grunge, britpop, and the more experimental 2000s art-rock thing—'of their time' but clearly pushing beyond it.",
+    "expected_vibe": "Mid-to-late-90s records that share DNA with The Bends and OK Computer: melodic, guitar-driven, harmonically interesting, and texturally curious. Still recognizably alt-rock or britpop-era, but with arrangement or production moves that point forward toward 2000s experimental/art-rock rather than backward to pure grunge or straight britpop homage."
+  },
+  {
+    "id": "holy-trinity-bandleaders",
+    "query": "If my two holy trinities are Miles/Zappa/Mingus for bandleaders and Hendrix/Coltrane/Marley for transcendently honest soul, who else belongs on my Mount Rushmore?",
+    "expected_vibe": "Artists with strong auteur or bandleader energy and/or spiritually intense, emotionally honest work—people who reshape bands and genres the way Miles, Zappa, Mingus, Hendrix, Coltrane, and Marley did. Not just influential or popular, but visionary figures with distinct compositional voices or deep spiritual/emotional weight in their music."
+  }
+]
