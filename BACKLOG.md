@@ -1,5 +1,11 @@
 # Backlog
 
+## In Progress
+
+- **AI music discovery pipeline** — Natural-language listening requests (e.g., "Saturday morning coffee, jazzy but modern, nothing harsh") resolved to ranked album recommendations with editorial reasoning. Architectural decision in [`docs/adr/0001-discovery-pipeline-hosting.md`](docs/adr/0001-discovery-pipeline-hosting.md) (Option C: hosted embeddings via Voyage + HF Inference free tier for LLM, behind swappable Go interfaces). Implementation plan in [`docs/plans/discovery-pipeline-plan.md`](docs/plans/discovery-pipeline-plan.md). **Status as of 2026-05-08: Phase 1 (foundations) complete; Phase 2 (provider clients) is next.** See the plan's Status section for the full progress map.
+
+  - **Related Artists** and **themed browsing** are downstream backlog items that can ride on the same `album_embeddings` table once the discovery pipeline is shipping. Worth picking up after Phase 6 closes.
+
 ## UI
 
 - **Contextual back navigation from album pages** — The album detail page should support richer return flows based on how the user arrived there. If an album was opened from an artist page, show a `Back to Artist` action that returns to that artist. Search return behavior should also distinguish between going back to prior search results vs. going back to an empty search screen, rather than sending every user to the same generic destination. This likely requires preserving navigation provenance and search state in the frontend.

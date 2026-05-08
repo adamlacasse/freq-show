@@ -6,6 +6,29 @@ This plan is the build-time companion to **[ADR-0001: Hosting strategy for the A
 
 ---
 
+## Status
+
+_Last updated 2026-05-08._
+
+| Phase | Status | Notes |
+|---|---|---|
+| 1. Foundations | ✅ Complete (2026-05-08) | Discovery types, `EmbeddingRepository` interface, SQLite migration for `album_embeddings`, vector encode/decode helpers, `DiscoveryConfig` in `config.go`, `RouterConfig.Embeddings` plumbed, MemoryStore + SQLite tests added |
+| 2. Provider clients | 🟡 Next | `pkg/sources/embeddings/` and `pkg/sources/llm/`. v1 defaults per ADR-0001: Voyage `voyage-3-lite` for embeddings, HF Inference free tier for LLM |
+| 3. Discovery package | ⏳ Pending Phase 2 | `pkg/discovery/` — prompts, interpret, retrieve+MMR, curate, pipeline orchestrator, embedding-text builder |
+| 4. HTTP wiring | ⏳ Pending Phase 3 | `POST /discover` handler, lazy-embedding hook in `getOrFetchAlbum` |
+| 5. Reindex CLI | ⏳ Pending Phase 2 | `cmd/reindex` — can land in parallel with phases 3–4 once Phase 2's `Embedder` exists |
+| 6. Frontend | ⏳ Pending Phase 4 | Angular `/discover` route + `DiscoverService` |
+| 7. Documentation | 🟡 Partial | BACKLOG entry added (this session); README + `agent-context/development-log.md` updates pending until Phase 4–6 land |
+
+**To resume work:** read this Status section, jump to the next non-✅ phase in [Step-by-Step Implementation](#step-by-step-implementation), and proceed. The package layout, constants, prompts, JSON schemas, and validation rules below stay current across phases — those are the spec, not the progress tracker.
+
+**Open questions / decisions parked:**
+
+- Whether the Render SQLite cache currently sits on a persistent disk or rebuilds on each deploy (ADR-0001 Action Item #2). Doesn't block Phase 2 because the lazy-embedding-on-hydration path and the reindex CLI both work either way; only the *frequency* of full backfills changes. Worth answering before Phase 5 ships.
+- Whether to validate the "no material difference between providers" benchmark finding against *interpreted* queries once Phase 3 lands. Documented as a follow-up in ADR-0001's methodology caveat. Not gating any phase, but a useful sanity check before declaring the discovery feature done.
+
+---
+
 ## What This Plan Is Testing
 
 This is the first AI-shaped feature in FreqShow and the first piece that crosses both backend and frontend in a single user-facing flow. It exercises:
@@ -322,7 +345,7 @@ Specific status codes:
 
 Build bottom-up so each layer is testable before the layer above lands. Top-to-bottom file order in the package is different from build order; matches the layout in [Package Layout](#package-layout).
 
-### Phase 1 — Foundations (no LLM, no embeddings yet)
+### Phase 1 — Foundations (no LLM, no embeddings yet) — ✅ Complete (2026-05-08)
 
 **Step 1.1 — Discovery types in `pkg/data/discovery.go`.**
 
@@ -409,7 +432,7 @@ Add `Discovery DiscoveryConfig` to `Config`. Add a `resolveDiscovery()` function
 
 Write `pkg/db/sqlite_test.go` cases for `SaveEmbedding` → `GetEmbedding` → `LoadAllForModel` → `DeleteOtherModels`. Run `go test ./...`. No discovery code exists yet but the persistence layer is verified.
 
-### Phase 2 — Provider clients
+### Phase 2 — Provider clients — 🟡 Next
 
 **Step 2.1 — `pkg/sources/embeddings/client.go`.**
 
