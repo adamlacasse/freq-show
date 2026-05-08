@@ -21,26 +21,46 @@ type AlbumRepository interface {
 	SaveAlbum(ctx context.Context, album *data.Album) error
 }
 
+// EmbeddingRepository defines persistence operations for album embedding vectors.
+// The `(mbid, model)` composite key lets multiple model versions coexist in
+// the table during a rolling reindex.
+type EmbeddingRepository interface {
+	GetEmbedding(ctx context.Context, mbid, model string) ([]float32, error)
+	SaveEmbedding(ctx context.Context, mbid, model string, vec []float32) error
+	LoadAllForModel(ctx context.Context, model string) ([]EmbeddingRecord, error)
+	DeleteOtherModels(ctx context.Context, keepModel string) (int, error)
+}
+
+// EmbeddingRecord is a single (mbid, vector) pair as returned by LoadAllForModel.
+// The model name is implicit in the query that produced the slice.
+type EmbeddingRecord struct {
+	MBID string
+	Vec  []float32
+}
+
 // Store encapsulates repository behavior with lifecycle management.
 type Store interface {
 	ArtistRepository
 	AlbumRepository
+	EmbeddingRepository
 	Close(ctx context.Context) error
 }
 
 // MemoryStore is an in-memory persistence layer backing the application during early development.
 type MemoryStore struct {
-	mu      sync.RWMutex
-	artists map[string]*data.Artist
-	albums  map[string]*data.Album
+	mu         sync.RWMutex
+	artists    map[string]*data.Artist
+	albums     map[string]*data.Album
+	embeddings map[string]map[string][]float32 // [model][mbid] -> vec
 }
 
 // NewMemoryStore constructs an in-memory store instance.
 func NewMemoryStore(ctx context.Context) (*MemoryStore, error) {
 	_ = ctx
 	return &MemoryStore{
-		artists: make(map[string]*data.Artist),
-		albums:  make(map[string]*data.Album),
+		artists:    make(map[string]*data.Artist),
+		albums:     make(map[string]*data.Album),
+		embeddings: make(map[string]map[string][]float32),
 	}, nil
 }
 
@@ -153,4 +173,90 @@ func cloneTracks(src []data.Track) []data.Track {
 
 func cloneReview(src data.Review) data.Review {
 	return src
+}
+
+// GetEmbedding retrieves an album embedding for the given (mbid, model) pair.
+// Returns (nil, nil) if no row exists.
+func (s *MemoryStore) GetEmbedding(ctx context.Context, mbid, model string) ([]float32, error) {
+	_ = ctx
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	byModel, ok := s.embeddings[model]
+	if !ok {
+		return nil, nil
+	}
+	vec, ok := byModel[mbid]
+	if !ok {
+		return nil, nil
+	}
+	out := make([]float32, len(vec))
+	copy(out, vec)
+	return out, nil
+}
+
+// SaveEmbedding upserts an embedding vector for (mbid, model).
+func (s *MemoryStore) SaveEmbedding(ctx context.Context, mbid, model string, vec []float32) error {
+	_ = ctx
+	if strings.TrimSpace(mbid) == "" {
+		return errors.New("db: embedding mbid required")
+	}
+	if strings.TrimSpace(model) == "" {
+		return errors.New("db: embedding model required")
+	}
+	if len(vec) == 0 {
+		return errors.New("db: embedding vector cannot be empty")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	byModel, ok := s.embeddings[model]
+	if !ok {
+		byModel = make(map[string][]float32)
+		s.embeddings[model] = byModel
+	}
+	stored := make([]float32, len(vec))
+	copy(stored, vec)
+	byModel[mbid] = stored
+	return nil
+}
+
+// LoadAllForModel returns every (mbid, vec) pair currently stored for the
+// given model. Caller-owned slices — modifying them does not mutate the store.
+func (s *MemoryStore) LoadAllForModel(ctx context.Context, model string) ([]EmbeddingRecord, error) {
+	_ = ctx
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	byModel, ok := s.embeddings[model]
+	if !ok {
+		return nil, nil
+	}
+	records := make([]EmbeddingRecord, 0, len(byModel))
+	for mbid, vec := range byModel {
+		out := make([]float32, len(vec))
+		copy(out, vec)
+		records = append(records, EmbeddingRecord{MBID: mbid, Vec: out})
+	}
+	return records, nil
+}
+
+// DeleteOtherModels removes every embedding whose model != keepModel and
+// returns the count of deleted records. Used by `cmd/reindex --prune-old`
+// after a rolling model swap.
+func (s *MemoryStore) DeleteOtherModels(ctx context.Context, keepModel string) (int, error) {
+	_ = ctx
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	deleted := 0
+	for model, byMBID := range s.embeddings {
+		if model == keepModel {
+			continue
+		}
+		deleted += len(byMBID)
+		delete(s.embeddings, model)
+	}
+	return deleted, nil
 }

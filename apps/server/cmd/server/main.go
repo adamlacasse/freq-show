@@ -76,6 +76,7 @@ func main() {
 		Reviews:     reviewsClient,
 		Artists:     store,
 		Albums:      store,
+		Embeddings:  store,
 	})
 
 	srv := &http.Server{

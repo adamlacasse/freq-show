@@ -41,6 +41,7 @@ type RouterConfig struct {
 	Reviews     ReviewsClient
 	Artists     db.ArtistRepository
 	Albums      db.AlbumRepository
+	Embeddings  db.EmbeddingRepository
 }
 
 // NewRouter wires the top-level HTTP routes for the backend.

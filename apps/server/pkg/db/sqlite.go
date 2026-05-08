@@ -3,9 +3,11 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -171,5 +173,149 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, createAlbums); err != nil {
 		return fmt.Errorf("db: migrate albums: %w", err)
 	}
+
+	const createEmbeddings = `CREATE TABLE IF NOT EXISTS album_embeddings (
+        mbid       TEXT NOT NULL,
+        model      TEXT NOT NULL,
+        dim        INTEGER NOT NULL,
+        vec        BLOB NOT NULL,
+        updated_at TIMESTAMP NOT NULL,
+        PRIMARY KEY (mbid, model)
+    )`
+
+	if _, err := s.db.ExecContext(ctx, createEmbeddings); err != nil {
+		return fmt.Errorf("db: migrate album_embeddings: %w", err)
+	}
+
+	const createEmbeddingsModelIdx = `CREATE INDEX IF NOT EXISTS album_embeddings_model_idx
+        ON album_embeddings (model)`
+
+	if _, err := s.db.ExecContext(ctx, createEmbeddingsModelIdx); err != nil {
+		return fmt.Errorf("db: migrate album_embeddings index: %w", err)
+	}
 	return nil
+}
+
+// GetEmbedding retrieves an embedding for (mbid, model). Returns (nil, nil)
+// if no row exists.
+func (s *SQLiteStore) GetEmbedding(ctx context.Context, mbid, model string) ([]float32, error) {
+	row := s.db.QueryRowContext(
+		ctx,
+		`SELECT vec FROM album_embeddings WHERE mbid = ? AND model = ?`,
+		mbid, model,
+	)
+
+	var blob []byte
+	if err := row.Scan(&blob); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("db: query embedding: %w", err)
+	}
+	vec, err := decodeVector(blob)
+	if err != nil {
+		return nil, fmt.Errorf("db: decode embedding: %w", err)
+	}
+	return vec, nil
+}
+
+// SaveEmbedding upserts an embedding for (mbid, model). The vector's length
+// is stored as the `dim` column for inspection and sanity checks.
+func (s *SQLiteStore) SaveEmbedding(ctx context.Context, mbid, model string, vec []float32) error {
+	if strings.TrimSpace(mbid) == "" {
+		return errors.New("db: embedding mbid required")
+	}
+	if strings.TrimSpace(model) == "" {
+		return errors.New("db: embedding model required")
+	}
+	if len(vec) == 0 {
+		return errors.New("db: embedding vector cannot be empty")
+	}
+
+	blob := encodeVector(vec)
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO album_embeddings (mbid, model, dim, vec, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(mbid, model) DO UPDATE SET dim = excluded.dim, vec = excluded.vec, updated_at = excluded.updated_at`,
+		mbid, model, len(vec), blob, time.Now().UTC(),
+	)
+	if err != nil {
+		return fmt.Errorf("db: upsert embedding: %w", err)
+	}
+	return nil
+}
+
+// LoadAllForModel returns every (mbid, vec) pair currently stored for the
+// given model. The caller may keep these in memory across requests; the
+// discovery service does this and reloads on a TTL or after a reindex.
+func (s *SQLiteStore) LoadAllForModel(ctx context.Context, model string) ([]EmbeddingRecord, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT mbid, vec FROM album_embeddings WHERE model = ?`,
+		model,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("db: query embeddings for model: %w", err)
+	}
+	defer rows.Close()
+
+	var records []EmbeddingRecord
+	for rows.Next() {
+		var mbid string
+		var blob []byte
+		if err := rows.Scan(&mbid, &blob); err != nil {
+			return nil, fmt.Errorf("db: scan embedding row: %w", err)
+		}
+		vec, err := decodeVector(blob)
+		if err != nil {
+			return nil, fmt.Errorf("db: decode embedding for %s: %w", mbid, err)
+		}
+		records = append(records, EmbeddingRecord{MBID: mbid, Vec: vec})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("db: iterate embedding rows: %w", err)
+	}
+	return records, nil
+}
+
+// DeleteOtherModels removes every embedding whose model != keepModel.
+// Returns the count of deleted records.
+func (s *SQLiteStore) DeleteOtherModels(ctx context.Context, keepModel string) (int, error) {
+	res, err := s.db.ExecContext(
+		ctx,
+		`DELETE FROM album_embeddings WHERE model != ?`,
+		keepModel,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("db: delete embeddings: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("db: rows affected: %w", err)
+	}
+	return int(n), nil
+}
+
+// encodeVector packs a float32 slice as raw little-endian bytes (4 bytes
+// per element). 4× smaller than JSON and avoids parse overhead at corpus scale.
+func encodeVector(v []float32) []byte {
+	buf := make([]byte, 4*len(v))
+	for i, f := range v {
+		binary.LittleEndian.PutUint32(buf[i*4:], math.Float32bits(f))
+	}
+	return buf
+}
+
+// decodeVector is the inverse of encodeVector.
+func decodeVector(b []byte) ([]float32, error) {
+	if len(b)%4 != 0 {
+		return nil, fmt.Errorf("vector blob has non-multiple-of-4 length: %d", len(b))
+	}
+	n := len(b) / 4
+	v := make([]float32, n)
+	for i := 0; i < n; i++ {
+		v[i] = math.Float32frombits(binary.LittleEndian.Uint32(b[i*4:]))
+	}
+	return v, nil
 }

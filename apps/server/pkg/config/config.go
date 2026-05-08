@@ -25,6 +25,8 @@ const (
 	defaultWikipediaTimeoutSeconds   = 8
 	defaultReviewsUserAgent          = "FreqShow/1.0 (https://github.com/adamlacasse/freq-show)"
 	defaultReviewsTimeoutSeconds     = 10
+	defaultDiscoveryEmbeddingsProv   = "voyage"
+	defaultDiscoveryLLMProv          = "huggingface"
 
 	shutdownTimeoutEnv              = "SHUTDOWN_TIMEOUT_SECONDS"
 	portEnv                         = "PORT"
@@ -46,6 +48,13 @@ const (
 	reviewsDiscogsTokenEnv          = "REVIEWS_DISCOGS_TOKEN"
 	reviewsDiscogsConsumerKeyEnv    = "REVIEWS_DISCOGS_CONSUMER_KEY"
 	reviewsDiscogsConsumerSecretEnv = "REVIEWS_DISCOGS_CONSUMER_SECRET"
+
+	discoveryEmbeddingsProviderEnv = "DISCOVERY_EMBEDDINGS_PROVIDER"
+	discoveryEmbeddingsAPIKeyEnv   = "DISCOVERY_EMBEDDINGS_API_KEY"
+	discoveryEmbeddingsModelEnv    = "DISCOVERY_EMBEDDINGS_MODEL"
+	discoveryLLMProviderEnv        = "DISCOVERY_LLM_PROVIDER"
+	discoveryLLMAPIKeyEnv          = "DISCOVERY_LLM_API_KEY"
+	discoveryLLMModelEnv           = "DISCOVERY_LLM_MODEL"
 )
 
 // Config captures runtime configuration derived from environment variables.
@@ -57,6 +66,7 @@ type Config struct {
 	Wikipedia       WikipediaConfig
 	Reviews         ReviewsConfig
 	Database        DatabaseConfig
+	Discovery       DiscoveryConfig
 }
 
 // MusicBrainzConfig describes how the MusicBrainz client should connect.
@@ -91,6 +101,20 @@ type DatabaseConfig struct {
 	URL    string
 }
 
+// DiscoveryConfig describes how the AI music discovery pipeline should reach
+// its hosted embedding and LLM providers. Empty API keys are tolerated at
+// load time — the discovery service surfaces a clear "unconfigured" state
+// at request time. This keeps the server bootable for development paths
+// that don't exercise the discovery feature yet.
+type DiscoveryConfig struct {
+	EmbeddingsProvider string
+	EmbeddingsAPIKey   string
+	EmbeddingsModel    string
+	LLMProvider        string
+	LLMAPIKey          string
+	LLMModel           string
+}
+
 // Load reads environment variables and assembles a Config instance.
 func Load() (*Config, error) {
 	port, err := resolvePort()
@@ -123,6 +147,8 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	discovery := resolveDiscovery()
+
 	env := strings.TrimSpace(envOrDefault(environmentEnv, defaultEnv))
 
 	return &Config{
@@ -133,6 +159,7 @@ func Load() (*Config, error) {
 		Wikipedia:       wikipedia,
 		Reviews:         reviews,
 		Database:        database,
+		Discovery:       discovery,
 	}, nil
 }
 
@@ -321,4 +348,24 @@ func resolveReviews() (ReviewsConfig, error) {
 		DiscogsConsumerSecret: strings.TrimSpace(discogsConsumerSecret),
 		Timeout:               timeout,
 	}, nil
+}
+
+func resolveDiscovery() DiscoveryConfig {
+	embedProvider := strings.ToLower(strings.TrimSpace(envOrDefault(discoveryEmbeddingsProviderEnv, defaultDiscoveryEmbeddingsProv)))
+	if embedProvider == "" {
+		embedProvider = defaultDiscoveryEmbeddingsProv
+	}
+	llmProvider := strings.ToLower(strings.TrimSpace(envOrDefault(discoveryLLMProviderEnv, defaultDiscoveryLLMProv)))
+	if llmProvider == "" {
+		llmProvider = defaultDiscoveryLLMProv
+	}
+
+	return DiscoveryConfig{
+		EmbeddingsProvider: embedProvider,
+		EmbeddingsAPIKey:   strings.TrimSpace(envOrDefault(discoveryEmbeddingsAPIKeyEnv, "")),
+		EmbeddingsModel:    strings.TrimSpace(envOrDefault(discoveryEmbeddingsModelEnv, "")),
+		LLMProvider:        llmProvider,
+		LLMAPIKey:          strings.TrimSpace(envOrDefault(discoveryLLMAPIKeyEnv, "")),
+		LLMModel:           strings.TrimSpace(envOrDefault(discoveryLLMModelEnv, "")),
+	}
 }
