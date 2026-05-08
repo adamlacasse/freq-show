@@ -131,9 +131,9 @@ Every magic number lives at the top of its file as a named constant. Centralizin
 
 | Constant | Value | Used by | Why this value |
 | --- | --- | --- | --- |
-| `DefaultEmbeddingProvider` | `"openai"` | discovery config | per ADR-0001 |
-| `DefaultEmbeddingModel` | `"text-embedding-3-small"` | OpenAI embedder | 1536-dim, $0.02/1M tokens |
-| `DefaultEmbeddingDim` | `1536` | sanity checks, sqlite schema | matches `text-embedding-3-small` |
+| `DefaultEmbeddingProvider` | `"voyage"` | discovery config | per ADR-0001 (selected after benchmark, 2026-05-08) |
+| `DefaultEmbeddingModel` | `"voyage-3-lite"` | Voyage embedder | 512-dim, free tier covers expected usage |
+| `DefaultEmbeddingDim` | `512` | sanity checks, sqlite schema | matches `voyage-3-lite` |
 | `DefaultLLMProvider` | `"huggingface"` | discovery config | free tier covers expected volume |
 | `DefaultLLMModelCandidates` | `("meta-llama/Llama-3.1-8B-Instruct", "Qwen/Qwen2.5-7B-Instruct", "HuggingFaceH4/zephyr-7b-beta", "microsoft/Phi-3.5-mini-instruct")` | HF chat client | Project 6/7's working fallback list |
 | `TopKRetrieval` | `30` | retrieve.go | enough headroom for MMR |
@@ -415,45 +415,45 @@ Write `pkg/db/sqlite_test.go` cases for `SaveEmbedding` → `GetEmbedding` → `
 
 The `Embedder` interface (Decision 1), `Config` struct, and `NewFromConfig` router (Decision 2). No model-specific code — that's in the provider files.
 
-**Step 2.2 — `pkg/sources/embeddings/openai.go`.**
+**Step 2.2 — `pkg/sources/embeddings/voyage.go` (the v1 default per ADR-0001).**
 
 ```go
-type OpenAIEmbedder struct {
+type VoyageEmbedder struct {
     apiKey string
     model  string
     dim    int
     http   *http.Client
 }
 
-func newOpenAIEmbedder(cfg Config) (*OpenAIEmbedder, error) {
+func newVoyageEmbedder(cfg Config) (*VoyageEmbedder, error) {
     if strings.TrimSpace(cfg.APIKey) == "" {
-        return nil, errors.New("embeddings: openai api key required")
+        return nil, errors.New("embeddings: voyage api key required")
     }
     model := cfg.Model
-    if model == "" { model = "text-embedding-3-small" }
-    return &OpenAIEmbedder{
+    if model == "" { model = "voyage-3-lite" }
+    return &VoyageEmbedder{
         apiKey: cfg.APIKey,
         model:  model,
-        dim:    1536, // text-embedding-3-small native dim
+        dim:    512, // voyage-3-lite native dim
         http:   &http.Client{Timeout: 10 * time.Second},
     }, nil
 }
 
-func (e *OpenAIEmbedder) Encode(ctx context.Context, text string) ([]float32, error) { ... }
-func (e *OpenAIEmbedder) EncodeBatch(ctx context.Context, texts []string) ([][]float32, error) { ... }
-func (e *OpenAIEmbedder) Model() string { return e.model }
-func (e *OpenAIEmbedder) Dim() int { return e.dim }
+func (e *VoyageEmbedder) Encode(ctx context.Context, text string) ([]float32, error) { ... }
+func (e *VoyageEmbedder) EncodeBatch(ctx context.Context, texts []string) ([][]float32, error) { ... }
+func (e *VoyageEmbedder) Model() string { return e.model }
+func (e *VoyageEmbedder) Dim() int { return e.dim }
 ```
 
-POST to `https://api.openai.com/v1/embeddings` with body `{"model": ..., "input": [...]}`, parse the response's `data[i].embedding` into `[]float32`. Standard OpenAI HTTP shape. Return a wrapped error on non-2xx.
+POST to `https://api.voyageai.com/v1/embeddings` with body `{"model": ..., "input": [...], "input_type": "document"}` for corpus embeds and `"input_type": "query"` for query embeds — Voyage's API distinguishes them and quality improves slightly when used correctly. Parse the response's `data[i].embedding` into `[]float32`. Return a wrapped error on non-2xx.
 
-**Step 2.3 — `pkg/sources/embeddings/huggingface.go`.**
+**Step 2.3 — `pkg/sources/embeddings/openai.go` (alternative provider).**
+
+POST to `https://api.openai.com/v1/embeddings` with body `{"model": ..., "input": [...]}`, parse the response's `data[i].embedding` into `[]float32`. Default model `text-embedding-3-small` (dim=1536). Standard OpenAI HTTP shape. Return a wrapped error on non-2xx. Implementation pattern is the same as `VoyageEmbedder`.
+
+**Step 2.4 — `pkg/sources/embeddings/huggingface.go` (alternative provider, also useful for the embedding path's fallback contingency).**
 
 POST to `https://api-inference.huggingface.co/pipeline/feature-extraction/{model}` with `{"inputs": [...]}`. Free-tier-aware: on 503 with `estimated_time` (model loading), wait the indicated duration once and retry. On 429, surface a typed `ErrRateLimit` error. Default model is `sentence-transformers/all-MiniLM-L6-v2` (dim=384).
-
-**Step 2.4 — `pkg/sources/embeddings/voyage.go`.**
-
-POST to `https://api.voyageai.com/v1/embeddings`. Same shape as OpenAI. Default model `voyage-3-lite` (dim=512).
 
 **Step 2.5 — `pkg/sources/llm/client.go`.**
 

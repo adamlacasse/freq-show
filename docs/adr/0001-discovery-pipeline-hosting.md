@@ -1,6 +1,6 @@
 # ADR-0001: Hosting strategy for the AI music discovery pipeline
 
-**Status:** Proposed
+**Status:** Proposed (Action Item #1 — embedding provider benchmark — resolved 2026-05-08)
 **Date:** 2026-05-05
 **Deciders:** Adam LaCasse
 
@@ -38,7 +38,9 @@ This is the inversion that drives the decision: **memory is the fixed resource; 
 
 **Adopt Option C: a pure-Go discovery pipeline that calls hosted embedding and LLM endpoints over HTTP.** No new language, no new service, no in-process ML model. The pipeline lives at `apps/server/pkg/discovery/`, with a handler wired into the existing router. The vector index is persisted in SQLite alongside the existing JSON-blob caches and built incrementally as albums get hydrated.
 
-**Embedding provider for v1:** `OpenAI text-embedding-3-small` as the default, pending a small benchmark against HF Inference API feature-extraction (`all-MiniLM-L6-v2`, for parity with Project 7) and Voyage `voyage-3-lite`. `text-embedding-3-small` produces higher-quality 1536-dim vectors than MiniLM-L6's 384-dim at comparable cost; the larger vector size is a non-issue at FreqShow's corpus scale.
+**Embedding provider for v1:** Voyage `voyage-3-lite` (512-dim). Selected after running the Action Item #1 benchmark (Voyage, HF MiniLM-L6, OpenAI `text-embedding-3-small`) against a 30+ album corpus and 14 representative queries. All three tied on retrieval quality on the rubric used; the choice fell to operational properties. Voyage offers the most generous free tier (covers expected usage indefinitely without billing setup), no cold-load latency on first call, and no minimum-balance gate. HF was comparable on quality but its ~1000-call/day free-tier rate limit and ~20-second cold-load on the first call after idle make it operationally unsuitable for the lazy-embedding-on-hydration path. OpenAI was viable but requires a positive account balance for any call — a gate we hit during benchmark testing, which is exactly the kind of friction the cost-ceiling discussion was meant to avoid in this phase.
+
+**Benchmark methodology caveat.** The benchmark tested embedders against raw user queries, not the *interpreted* queries the production pipeline will actually embed (which are produced by the interpretation LLM call and contain structured fields rather than freeform text). The "no material difference" finding may not hold once the interpretation step is in place — interpreted queries are richer and more semantically loaded. Re-validation against interpreted queries is a follow-up after Phase 3 of the implementation plan lands. If a different provider wins clearly on interpreted queries, the `Embedder` interface makes the swap a one-line change.
 
 **LLM provider for v1:** HF Inference API free tier, using the same instruction-tuned chat models the Project 7 client targets. If free-tier rate limits start hurting, swap to OpenAI `gpt-4o-mini` or Anthropic Claude Haiku — both well under a dollar/month at expected volume, and the chat-completion shape is similar enough that the swap is a client-class change, not a redesign.
 
@@ -88,7 +90,7 @@ Go server calls a hosted embedding API for both query-time and indexing embeddin
 | Dimension | Assessment |
 |---|---|
 | Complexity | Low — no new runtime, no model files, no tokenizers; just HTTP clients and float32-slice math |
-| Cost | Sub-dollar/month at "a few users" scale. 5K-album backfill on `text-embedding-3-small` is ~$0.05 one-time. Query-time embeddings round to zero. |
+| Cost | Free tier covers expected usage indefinitely on Voyage (the chosen provider). 5K-album backfill is ~2.5M tokens, well within Voyage's free-tier headroom. Paid tier across providers is comparable (~$0.02/1M tokens) if free tier is ever exhausted. |
 | Scalability | Bounded by hosted-API rate limits; paid tiers have generous limits |
 | Team familiarity | High — Go HTTP clients and `[]float32` math are well within Adam's Go comfort zone |
 | Operational burden | Low — same one-binary deployment as today |
@@ -138,7 +140,7 @@ What we'll need to revisit:
 
 ## Action Items
 
-1. [ ] **Embedding provider benchmark.** Hand-pick ~30 album records and ~10 representative natural-language queries. Embed both with `text-embedding-3-small`, HF `all-MiniLM-L6-v2`, and Voyage `voyage-3-lite`. Eyeball top-5 retrieval per query against gut-check ground truth. Lock in the provider that wins or ties on quality at the lowest cost.
+1. [x] **Embedding provider benchmark.** *Resolved 2026-05-08:* Voyage `voyage-3-lite` selected. All three providers tied on quality across the curated corpus (30+ albums) and queries (14); operational properties decided it. Benchmark script and inputs live at `scripts/embedding-benchmark/`; raw `results/` are local-only (gitignored). See Decision section for full rationale and the methodology caveat about raw-vs-interpreted queries.
 2. [ ] **Confirm SQLite persistence on Render.** Per the dashboard checks (Disks tab, Environment tab, Shell `df -h` and `ls -la freqshow.db`). The answer informs whether re-backfill on deploy is normal-case or rare. Either way, Option C handles it; this is just to know what to expect.
 3. [ ] **Design `apps/server/pkg/discovery/` package layout.** Proposed files: `types.go`, `prompts.go`, `embedder.go` (the `Embedder` interface plus a default provider implementation and an `HFEmbedder` contingency), `llm.go` (chat-completion client interface), `interpret.go`, `retrieve.go` (cosine + MMR), `curate.go`, `index.go` (persistence + incremental rebuild), `handler.go`.
 4. [ ] **Vector-index storage.** New `album_embeddings` table with `(mbid TEXT PRIMARY KEY, vec BLOB, model TEXT NOT NULL, dim INTEGER NOT NULL, updated_at TIMESTAMP)`. The `model` and `dim` columns let multiple embedding versions coexist during a swap. Brute-force cosine over loaded `[]float32` is fine through ~10K rows.
