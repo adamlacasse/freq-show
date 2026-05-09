@@ -10,6 +10,9 @@ import (
 	"github.com/adamlacasse/freq-show/apps/server/pkg/api"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/config"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/db"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/discovery"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/embeddings"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/llm"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/musicbrainz"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/reviews"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/wikipedia"
@@ -70,6 +73,41 @@ func main() {
 		DiscogsConsumerSecret: cfg.Reviews.DiscogsConsumerSecret,
 	})
 
+	var (
+		discoveryEmbedder embeddings.Embedder
+		discoveryService  *discovery.Service
+	)
+	if cfg.Discovery.EmbeddingsAPIKey != "" && cfg.Discovery.LLMAPIKey != "" {
+		discoveryEmbedder, err = embeddings.NewFromConfig(embeddings.Config{
+			Provider: cfg.Discovery.EmbeddingsProvider,
+			APIKey:   cfg.Discovery.EmbeddingsAPIKey,
+			Model:    cfg.Discovery.EmbeddingsModel,
+			BaseURL:  cfg.Discovery.EmbeddingsBaseURL,
+		})
+		if err != nil {
+			log.Printf("discovery embedder init failed; discovery disabled: %v", err)
+		} else {
+			discoveryLLM, err := llm.NewFromConfig(llm.Config{
+				Provider: cfg.Discovery.LLMProvider,
+				APIKey:   cfg.Discovery.LLMAPIKey,
+				Model:    cfg.Discovery.LLMModel,
+			})
+			if err != nil {
+				log.Printf("discovery llm init failed; discovery disabled: %v", err)
+				discoveryEmbedder = nil
+			} else {
+				discoveryService = &discovery.Service{
+					Embedder:   discoveryEmbedder,
+					LLM:        discoveryLLM,
+					Embeddings: store,
+					Albums:     store,
+				}
+			}
+		}
+	} else {
+		log.Printf("discovery disabled: missing discovery provider API key(s)")
+	}
+
 	router := api.NewRouter(api.RouterConfig{
 		MusicBrainz: mbClient,
 		Wikipedia:   wikiClient,
@@ -77,6 +115,8 @@ func main() {
 		Artists:     store,
 		Albums:      store,
 		Embeddings:  store,
+		Embedder:    discoveryEmbedder,
+		Discovery:   discoveryService,
 	})
 
 	srv := &http.Server{

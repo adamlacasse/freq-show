@@ -132,6 +132,13 @@ func (s *stubAlbumRepo) SaveAlbum(ctx context.Context, album *data.Album) error 
 	return nil
 }
 
+func (s *stubAlbumRepo) ListAlbumsMissingEmbedding(ctx context.Context, model string, limit int) ([]data.Album, error) {
+	_ = ctx
+	_ = model
+	_ = limit
+	return nil, nil
+}
+
 func TestArtistLookupHandlerReturnsCachedArtist(t *testing.T) {
 	cached := &data.Artist{
 		ID:           testArtistID,
@@ -459,7 +466,7 @@ func TestAlbumLookupHandlerReturnsCachedAlbum(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, albumPath, nil)
 	res := httptest.NewRecorder()
 
-	albumLookupHandler(repo, mb, &stubReviews{}).ServeHTTP(res, req)
+	albumLookupHandler(repo, nil, nil, mb, &stubReviews{}).ServeHTTP(res, req)
 
 	if res.Code != http.StatusOK {
 		t.Fatalf(status200Fmt, res.Code)
@@ -516,7 +523,7 @@ func TestAlbumLookupHandlerFetchesAndCaches(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, albumPath, nil)
 	res := httptest.NewRecorder()
 
-	albumLookupHandler(repo, mb, &stubReviews{}).ServeHTTP(res, req)
+	albumLookupHandler(repo, nil, nil, mb, &stubReviews{}).ServeHTTP(res, req)
 
 	if res.Code != http.StatusOK {
 		t.Fatalf(status200Fmt, res.Code)
@@ -545,7 +552,7 @@ func TestAlbumLookupHandlerNotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, missingAlbum, nil)
 	res := httptest.NewRecorder()
 
-	albumLookupHandler(repo, mb, &stubReviews{}).ServeHTTP(res, req)
+	albumLookupHandler(repo, nil, nil, mb, &stubReviews{}).ServeHTTP(res, req)
 
 	if res.Code != http.StatusNotFound {
 		t.Fatalf("expected status 404, got %d", res.Code)
@@ -559,7 +566,7 @@ func TestAlbumLookupHandlerBadRequest(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, baseAlbumPath, nil)
 	res := httptest.NewRecorder()
 
-	albumLookupHandler(repo, mb, &stubReviews{}).ServeHTTP(res, req)
+	albumLookupHandler(repo, nil, nil, mb, &stubReviews{}).ServeHTTP(res, req)
 
 	if res.Code != http.StatusBadRequest {
 		t.Fatalf(status400Fmt, res.Code)
@@ -628,7 +635,7 @@ func TestAlbumLookupHandlerNormalizesEmptySlices(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, albumPath, nil)
 	res := httptest.NewRecorder()
 
-	albumLookupHandler(repo, &stubMusicBrainz{}, &stubReviews{}).ServeHTTP(res, req)
+	albumLookupHandler(repo, nil, nil, &stubMusicBrainz{}, &stubReviews{}).ServeHTTP(res, req)
 
 	if res.Code != http.StatusOK {
 		t.Fatalf(status200Fmt, res.Code)
@@ -661,7 +668,7 @@ func TestAlbumLookupHandlerKeepsTracksWhenPopulated(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, albumPath, nil)
 	res := httptest.NewRecorder()
 
-	albumLookupHandler(repo, mb, &stubReviews{}).ServeHTTP(res, req)
+	albumLookupHandler(repo, nil, nil, mb, &stubReviews{}).ServeHTTP(res, req)
 
 	if res.Code != http.StatusOK {
 		t.Fatalf(status200Fmt, res.Code)
@@ -770,7 +777,7 @@ func TestAlbumLookupHandlerReturnsRateLimit(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, albumPath, nil)
 	res := httptest.NewRecorder()
 
-	albumLookupHandler(repo, mb, &stubReviews{}).ServeHTTP(res, req)
+	albumLookupHandler(repo, nil, nil, mb, &stubReviews{}).ServeHTTP(res, req)
 
 	if res.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected status 429, got %d", res.Code)

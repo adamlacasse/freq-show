@@ -135,6 +135,18 @@ For backend-only development, you can configure environment variables (optional)
 - `REVIEWS_DISCOGS_CONSUMER_SECRET` – Your Discogs OAuth consumer secret (required for reviews)
 - `REVIEWS_DISCOGS_TOKEN` – Optional personal access token (alternative to OAuth)
 
+**Discovery Pipeline:**
+
+- `DISCOVERY_EMBEDDINGS_PROVIDER` (`voyage`, `openai`, or `huggingface`; default `voyage`)
+- `DISCOVERY_EMBEDDINGS_API_KEY` – API key for the selected embedding provider
+- `DISCOVERY_EMBEDDINGS_MODEL` – Optional embedding model override
+- `DISCOVERY_EMBEDDINGS_BASE_URL` – Optional embedding API base URL override; use `https://ai.mongodb.com/v1` for MongoDB Atlas model API keys
+- `DISCOVERY_LLM_PROVIDER` (`huggingface`, `openai`, or `anthropic`; default `huggingface`)
+- `DISCOVERY_LLM_API_KEY` – API key for the selected LLM provider
+- `DISCOVERY_LLM_MODEL` – Optional chat model override
+
+For local `dev.sh` / `apps/server/run.sh`, put these values in the repository-root `.env`; those scripts do not read `apps/server/.env.example` directly. After keys are configured, run `cd apps/server && go run ./cmd/reindex --limit 50` to seed album embeddings before using `/discover`.
+
 **Note**: The `.env` file already includes Discogs OAuth credentials for development. Reviews will be fetched automatically when you use `dev.sh` or `run.sh`.
 MusicBrainz requires a contact email and descriptive user agent—update the defaults if you deploy publicly.
 
@@ -207,6 +219,7 @@ npm start
 ### 🔍 Search & Discovery
 
 - **⚡ Real-time Search** - Debounced artist search with MusicBrainz integration and rich result cards
+- **🧠 AI Album Discovery** - Natural-language listening requests resolved through hosted embeddings, MMR retrieval, and LLM curation
 - **🎯 Rich Metadata** - Artist country, type, life spans, aliases, and disambiguation in search results
 - **🧭 Seamless Navigation** - Intuitive flow: search → artist biography/genres → chronological albums → track details
 
@@ -221,6 +234,7 @@ npm start
 
 - **🚀 High-Performance Backend** - Go API with multi-source data aggregation and intelligent caching
 - **💾 Smart Persistence** - SQLite caching for instant subsequent loads of artist/album data
+- **🧭 Discovery Reindexing** - `go run ./cmd/reindex` backfills album embeddings and supports model-swap pruning
 - **🔄 Reactive Frontend** - Angular 17 with RxJS state management and component-based architecture
 - **� Monorepo Structure** - Clean separation between backend API and frontend applications
 
@@ -243,7 +257,7 @@ npm start
 **User Experience Features:**
 
 - **Personal Collections** - Save favorite artists, albums, and create custom playlists
-- **Discovery Mode** - Algorithmic recommendations and themed browsing experiences
+- **Discovery Refinements** - Real-key smoke tests, interpreted-query tuning, and richer recommendation controls
 - **Search Result Caching** - Cache popular queries for improved performance and offline capability
 - **Export Features** - Generate shareable artist/album reports and music discovery lists
 

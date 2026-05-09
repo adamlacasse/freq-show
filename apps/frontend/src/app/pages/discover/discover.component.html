@@ -1,0 +1,134 @@
+<section class="border-b border-white/5 bg-freq-midnight/40">
+  <div class="mx-auto max-w-6xl px-6 py-12">
+    <div class="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+      <div class="max-w-2xl">
+        <p class="text-xs uppercase tracking-[0.3em] text-freq-teal/80">Discovery</p>
+        <h1 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl">Find the next record.</h1>
+        <p class="mt-4 text-base leading-relaxed text-freq-cream/75">
+          Describe a listening mood, reference point, or texture. FreqShow will search the hydrated album index and return five ranked picks.
+        </p>
+      </div>
+      <a routerLink="/" class="w-fit rounded-full border border-white/15 px-4 py-2 text-sm font-medium text-freq-cream transition hover:border-white/35 hover:bg-white/10">
+        Back to search
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="mx-auto grid max-w-6xl gap-8 px-6 py-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+  <form (ngSubmit)="submit()" class="space-y-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-freq-card">
+    <div>
+      <label for="query" class="text-sm font-semibold text-white">Listening request</label>
+      <textarea
+        id="query"
+        name="query"
+        [(ngModel)]="query"
+        rows="7"
+        maxlength="1000"
+        class="mt-3 w-full resize-y rounded-2xl border border-white/10 bg-freq-ink/80 px-4 py-3 text-base leading-relaxed text-white outline-none transition placeholder:text-freq-cream/35 focus:border-freq-teal/70"
+        placeholder="Saturday morning coffee, jazzy but modern, nothing harsh"
+      ></textarea>
+      <div class="mt-2 text-right text-xs text-freq-cream/45">{{ query.length }}/1000</div>
+    </div>
+
+    <div>
+      <label for="known" class="text-sm font-semibold text-white">Already familiar with</label>
+      <input
+        id="known"
+        name="known"
+        [(ngModel)]="alreadyKnown"
+        class="mt-3 w-full rounded-2xl border border-white/10 bg-freq-ink/80 px-4 py-3 text-sm text-white outline-none transition placeholder:text-freq-cream/35 focus:border-freq-teal/70"
+        placeholder="Kamasi Washington, Radiohead"
+      />
+    </div>
+
+    <div class="flex flex-wrap gap-3">
+      @for (example of examples; track example) {
+        <button
+          type="button"
+          (click)="useExample(example)"
+          class="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-left text-xs text-freq-cream/75 transition hover:border-freq-teal/50 hover:bg-freq-teal/10 hover:text-white"
+        >
+          {{ example }}
+        </button>
+      }
+    </div>
+
+    <button
+      type="submit"
+      [disabled]="isLoading || !query.trim()"
+      class="inline-flex min-h-11 items-center justify-center rounded-full bg-freq-teal px-6 py-3 text-sm font-semibold text-freq-ink transition hover:bg-freq-teal/90 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      @if (isLoading) {
+        Searching...
+      } @else {
+        Discover albums
+      }
+    </button>
+
+    @if (error) {
+      <div class="rounded-2xl border border-freq-rose/30 bg-freq-rose/10 px-4 py-3 text-sm text-freq-rose">
+        {{ error }}
+      </div>
+    }
+  </form>
+
+  <div class="min-h-[28rem]">
+    @if (isLoading) {
+      <div class="flex h-full min-h-80 items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03]">
+        <div class="text-center">
+          <div class="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-freq-teal border-t-transparent"></div>
+          <p class="mt-4 text-sm text-freq-cream/70">Reading the shelves...</p>
+        </div>
+      </div>
+    } @else if (result) {
+      <div class="space-y-6">
+        <div class="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+          <div class="flex flex-wrap gap-2">
+            <span class="rounded-full bg-freq-teal/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-freq-teal">
+              {{ result.interpreted.discoveryAppetite }} appetite
+            </span>
+            @for (quality of result.interpreted.sonicQualities; track quality) {
+              <span class="rounded-full bg-white/[0.06] px-3 py-1 text-xs text-freq-cream/75">{{ quality }}</span>
+            }
+          </div>
+          <p class="mt-4 text-sm leading-relaxed text-freq-cream/80">{{ result.interpreted.mood }}</p>
+        </div>
+
+        @if (result.picks.length > 0) {
+          <div class="space-y-4">
+            @for (pick of result.picks; track trackByAlbumId($index, pick)) {
+              <article class="rounded-3xl border border-white/10 bg-white/[0.04] p-5 transition hover:border-white/20 hover:bg-white/[0.07]">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div class="text-xs font-semibold uppercase tracking-wide text-freq-amber">#{{ pick.rank }}</div>
+                    <h2 class="mt-1 text-xl font-semibold text-white">{{ pick.title }}</h2>
+                    <p class="text-sm text-freq-cream/65">{{ pick.artistName }} @if (pick.year) { <span>({{ pick.year }})</span> }</p>
+                  </div>
+                  <div class="flex gap-2">
+                    <a [routerLink]="['/albums', pick.albumId]" class="rounded-full border border-white/15 px-3 py-2 text-xs font-semibold text-freq-cream transition hover:border-white/35 hover:bg-white/10">
+                      Album
+                    </a>
+                    <a [href]="pick.spotifySearchUrl" target="_blank" rel="noopener" class="rounded-full bg-freq-rose/20 px-3 py-2 text-xs font-semibold text-freq-rose transition hover:bg-freq-rose/30">
+                      Spotify
+                    </a>
+                  </div>
+                </div>
+                <p class="mt-4 text-sm leading-relaxed text-freq-cream/80">{{ pick.whyItFits }}</p>
+                <p class="mt-3 border-l border-freq-teal/50 pl-3 text-sm leading-relaxed text-freq-cream/70">{{ pick.whatToListenFor }}</p>
+              </article>
+            }
+          </div>
+        } @else {
+          <div class="rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-sm text-freq-cream/70">
+            No picks matched after the avoid filters.
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="flex h-full min-h-80 items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-freq-cream/60">
+        Results will appear here.
+      </div>
+    }
+  </div>
+</section>

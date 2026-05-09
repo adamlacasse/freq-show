@@ -52,6 +52,7 @@ const (
 	discoveryEmbeddingsProviderEnv = "DISCOVERY_EMBEDDINGS_PROVIDER"
 	discoveryEmbeddingsAPIKeyEnv   = "DISCOVERY_EMBEDDINGS_API_KEY"
 	discoveryEmbeddingsModelEnv    = "DISCOVERY_EMBEDDINGS_MODEL"
+	discoveryEmbeddingsBaseURLEnv  = "DISCOVERY_EMBEDDINGS_BASE_URL"
 	discoveryLLMProviderEnv        = "DISCOVERY_LLM_PROVIDER"
 	discoveryLLMAPIKeyEnv          = "DISCOVERY_LLM_API_KEY"
 	discoveryLLMModelEnv           = "DISCOVERY_LLM_MODEL"
@@ -110,6 +111,7 @@ type DiscoveryConfig struct {
 	EmbeddingsProvider string
 	EmbeddingsAPIKey   string
 	EmbeddingsModel    string
+	EmbeddingsBaseURL  string
 	LLMProvider        string
 	LLMAPIKey          string
 	LLMModel           string
@@ -364,6 +366,7 @@ func resolveDiscovery() DiscoveryConfig {
 		EmbeddingsProvider: embedProvider,
 		EmbeddingsAPIKey:   strings.TrimSpace(envOrDefault(discoveryEmbeddingsAPIKeyEnv, "")),
 		EmbeddingsModel:    strings.TrimSpace(envOrDefault(discoveryEmbeddingsModelEnv, "")),
+		EmbeddingsBaseURL:  strings.TrimRight(strings.TrimSpace(envOrDefault(discoveryEmbeddingsBaseURLEnv, "")), "/"),
 		LLMProvider:        llmProvider,
 		LLMAPIKey:          strings.TrimSpace(envOrDefault(discoveryLLMAPIKeyEnv, "")),
 		LLMModel:           strings.TrimSpace(envOrDefault(discoveryLLMModelEnv, "")),

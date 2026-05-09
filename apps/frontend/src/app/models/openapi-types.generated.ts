@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discover albums from a natural-language listening request */
+        post: operations["discoverAlbums"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/artists/{id}": {
         parameters: {
             query?: never;
@@ -96,6 +113,33 @@ export interface components {
             disambiguation?: string | null;
             aliases?: string[];
             lifeSpan: components["schemas"]["LifeSpan"];
+        };
+        DiscoveryQuery: {
+            query: string;
+            alreadyKnown?: string[];
+        };
+        InterpretedQuery: {
+            mood: string;
+            eraHints: string[];
+            sonicQualities: string[];
+            referenceArtists: string[];
+            avoid: string[];
+            /** @enum {string} */
+            discoveryAppetite: "low" | "medium" | "high";
+        };
+        DiscoveryPick: {
+            rank: number;
+            albumId: string;
+            title: string;
+            artistName: string;
+            year: number;
+            whyItFits: string;
+            whatToListenFor: string;
+            spotifySearchUrl: string;
+        };
+        DiscoveryResult: {
+            interpreted: components["schemas"]["InterpretedQuery"];
+            picks: components["schemas"]["DiscoveryPick"][];
         };
         Artist: {
             id: string;
@@ -243,6 +287,58 @@ export interface operations {
             405: components["responses"]["MethodNotAllowed"];
             /** @description Search failed */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    discoverAlbums: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscoveryQuery"];
+            };
+        };
+        responses: {
+            /** @description Discovery recommendations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveryResult"];
+                };
+            };
+            /** @description Invalid request body or query */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            405: components["responses"]["MethodNotAllowed"];
+            /** @description Discovery provider failure or invalid LLM output */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Discovery unavailable or index not ready */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

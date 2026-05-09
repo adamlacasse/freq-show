@@ -13,12 +13,12 @@ _Last updated 2026-05-08._
 | Phase | Status | Notes |
 |---|---|---|
 | 1. Foundations | ✅ Complete (2026-05-08) | Discovery types, `EmbeddingRepository` interface, SQLite migration for `album_embeddings`, vector encode/decode helpers, `DiscoveryConfig` in `config.go`, `RouterConfig.Embeddings` plumbed, MemoryStore + SQLite tests added |
-| 2. Provider clients | 🟡 Next | `pkg/sources/embeddings/` and `pkg/sources/llm/`. v1 defaults per ADR-0001: Voyage `voyage-3-lite` for embeddings, HF Inference free tier for LLM |
-| 3. Discovery package | ⏳ Pending Phase 2 | `pkg/discovery/` — prompts, interpret, retrieve+MMR, curate, pipeline orchestrator, embedding-text builder |
-| 4. HTTP wiring | ⏳ Pending Phase 3 | `POST /discover` handler, lazy-embedding hook in `getOrFetchAlbum` |
-| 5. Reindex CLI | ⏳ Pending Phase 2 | `cmd/reindex` — can land in parallel with phases 3–4 once Phase 2's `Embedder` exists |
-| 6. Frontend | ⏳ Pending Phase 4 | Angular `/discover` route + `DiscoverService` |
-| 7. Documentation | 🟡 Partial | BACKLOG entry added (this session); README + `agent-context/development-log.md` updates pending until Phase 4–6 land |
+| 2. Provider clients | ✅ Complete (2026-05-08) | `pkg/sources/embeddings/` and `pkg/sources/llm/` added with Voyage/OpenAI/Hugging Face embedding clients and Hugging Face/OpenAI/Anthropic chat clients; request/response parsing covered by local HTTP tests |
+| 3. Discovery package | ✅ Complete (2026-05-08) | `pkg/discovery/` added with prompts, interpretation retry/validation, embedding-text builder, cosine+MMR retrieval, curation retry/validation, and pipeline tests |
+| 4. HTTP wiring | ✅ Complete (2026-05-08) | `POST /discover` handler, server discovery-service wiring, OpenAPI contract, generated frontend API types, and best-effort lazy embedding hook in `getOrFetchAlbum` |
+| 5. Reindex CLI | ✅ Complete (2026-05-08) | `cmd/reindex` added with `--limit`, `--dry-run`, and `--prune-old`; DB repositories can list albums missing embeddings for the current model |
+| 6. Frontend | ✅ Complete (2026-05-08) | Angular `/discover` route, `DiscoverService`, form/result UI, route/nav wiring, and component smoke tests added |
+| 7. Documentation | ✅ Complete (2026-05-08) | BACKLOG, README, and `agent-context/development-log.md` updated for the discovery pipeline implementation |
 
 **To resume work:** read this Status section, jump to the next non-✅ phase in [Step-by-Step Implementation](#step-by-step-implementation), and proceed. The package layout, constants, prompts, JSON schemas, and validation rules below stay current across phases — those are the spec, not the progress tracker.
 

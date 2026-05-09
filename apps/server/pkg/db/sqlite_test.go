@@ -292,3 +292,54 @@ func TestSQLiteStoreSaveAndGetAlbum(t *testing.T) {
 		t.Fatalf("expected updated title, got %q", updated.Title)
 	}
 }
+
+func TestSQLiteStoreListAlbumsMissingEmbedding(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	dsn := "file:" + filepath.Join(dir, sqliteDBName) + sqliteQuerySuffix
+
+	store, err := NewSQLiteStore(context.Background(), dsn)
+	if err != nil {
+		t.Fatalf(sqliteNewErrFmt, err)
+	}
+	defer func() {
+		if err := store.Close(context.Background()); err != nil {
+			t.Fatalf(sqliteCloseErrFmt, err)
+		}
+	}()
+
+	for _, album := range []*data.Album{
+		{ID: "album-1", Title: "One"},
+		{ID: "album-2", Title: "Two"},
+		{ID: "album-3", Title: "Three"},
+	} {
+		if err := store.SaveAlbum(context.Background(), album); err != nil {
+			t.Fatalf("SaveAlbum(%s) returned error: %v", album.ID, err)
+		}
+	}
+	if err := store.SaveEmbedding(context.Background(), "album-2", "voyage-3-lite", []float32{1, 2}); err != nil {
+		t.Fatalf("SaveEmbedding returned error: %v", err)
+	}
+
+	missing, err := store.ListAlbumsMissingEmbedding(context.Background(), "voyage-3-lite", 10)
+	if err != nil {
+		t.Fatalf("ListAlbumsMissingEmbedding returned error: %v", err)
+	}
+	if len(missing) != 2 {
+		t.Fatalf("expected 2 missing albums, got %d", len(missing))
+	}
+	for _, album := range missing {
+		if album.ID == "album-2" {
+			t.Fatalf("album with existing embedding was returned: %#v", album)
+		}
+	}
+
+	limited, err := store.ListAlbumsMissingEmbedding(context.Background(), "voyage-3-lite", 1)
+	if err != nil {
+		t.Fatalf("ListAlbumsMissingEmbedding(limit) returned error: %v", err)
+	}
+	if len(limited) != 1 {
+		t.Fatalf("expected 1 limited result, got %d", len(limited))
+	}
+}

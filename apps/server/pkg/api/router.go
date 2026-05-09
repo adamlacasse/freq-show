@@ -12,6 +12,8 @@ import (
 
 	"github.com/adamlacasse/freq-show/apps/server/pkg/data"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/db"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/discovery"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/embeddings"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/musicbrainz"
 )
 
@@ -42,6 +44,8 @@ type RouterConfig struct {
 	Artists     db.ArtistRepository
 	Albums      db.AlbumRepository
 	Embeddings  db.EmbeddingRepository
+	Embedder    embeddings.Embedder
+	Discovery   *discovery.Service
 }
 
 // NewRouter wires the top-level HTTP routes for the backend.
@@ -49,8 +53,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", healthHandler)
 	mux.Handle("/artists/", artistLookupHandler(cfg.Artists, cfg.MusicBrainz, cfg.Wikipedia))
-	mux.Handle("/albums/", albumLookupHandler(cfg.Albums, cfg.MusicBrainz, cfg.Reviews))
+	mux.Handle("/albums/", albumLookupHandler(cfg.Albums, cfg.Embeddings, cfg.Embedder, cfg.MusicBrainz, cfg.Reviews))
 	mux.HandleFunc("/search", searchHandler(cfg.MusicBrainz))
+	mux.HandleFunc("/discover", discoverHandler(cfg.Discovery))
 	return corsMiddleware(mux)
 }
 
@@ -89,7 +94,7 @@ func artistLookupHandler(repo db.ArtistRepository, mbClient MusicBrainzClient, w
 	})
 }
 
-func albumLookupHandler(repo db.AlbumRepository, client MusicBrainzClient, reviewsClient ReviewsClient) http.Handler {
+func albumLookupHandler(repo db.AlbumRepository, embeddingsRepo db.EmbeddingRepository, embedder embeddings.Embedder, client MusicBrainzClient, reviewsClient ReviewsClient) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !assertMethod(w, r, http.MethodGet) {
 			return
@@ -101,7 +106,7 @@ func albumLookupHandler(repo db.AlbumRepository, client MusicBrainzClient, revie
 			return
 		}
 
-		album, err := getOrFetchAlbum(r.Context(), repo, client, reviewsClient, id)
+		album, err := getOrFetchAlbum(r.Context(), repo, embeddingsRepo, embedder, client, reviewsClient, id)
 		if err != nil {
 			handleAPIError(w, err)
 			return
@@ -270,13 +275,14 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, mbClient Mu
 	return domainArtist, nil
 }
 
-func getOrFetchAlbum(ctx context.Context, repo db.AlbumRepository, client MusicBrainzClient, reviewsClient ReviewsClient, id string) (*data.Album, error) {
+func getOrFetchAlbum(ctx context.Context, repo db.AlbumRepository, embeddingsRepo db.EmbeddingRepository, embedder embeddings.Embedder, client MusicBrainzClient, reviewsClient ReviewsClient, id string) (*data.Album, error) {
 	if repo != nil {
 		album, err := repo.GetAlbum(ctx, id)
 		if err != nil {
 			return nil, newAPIError(http.StatusInternalServerError, "album lookup failed")
 		}
 		if album != nil {
+			saveAlbumEmbeddingBestEffort(ctx, album, embeddingsRepo, embedder)
 			return album, nil
 		}
 	}
@@ -320,8 +326,28 @@ func getOrFetchAlbum(ctx context.Context, repo db.AlbumRepository, client MusicB
 			return nil, newAPIError(http.StatusInternalServerError, "album cache failed")
 		}
 	}
+	saveAlbumEmbeddingBestEffort(ctx, domainAlbum, embeddingsRepo, embedder)
 
 	return domainAlbum, nil
+}
+
+func saveAlbumEmbeddingBestEffort(ctx context.Context, album *data.Album, repo db.EmbeddingRepository, embedder embeddings.Embedder) {
+	if album == nil || repo == nil || embedder == nil {
+		return
+	}
+	existing, err := repo.GetEmbedding(ctx, album.ID, embedder.Model())
+	if err != nil || existing != nil {
+		return
+	}
+	text := discovery.BuildAlbumEmbeddingText(album, nil)
+	if text == "" {
+		return
+	}
+	vec, err := embedder.EncodeBatch(ctx, []string{text})
+	if err != nil || len(vec) != 1 || len(vec[0]) == 0 {
+		return
+	}
+	_ = repo.SaveEmbedding(ctx, album.ID, embedder.Model(), vec[0])
 }
 
 func transformArtist(src *musicbrainz.Artist) *data.Artist {

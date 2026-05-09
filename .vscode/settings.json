@@ -1,3 +1,8 @@
 {
-  "python.defaultInterpreterPath": "${workspaceFolder}/scripts/embedding-benchmark/.venv/bin/python"
+  "python.defaultInterpreterPath": "${workspaceFolder}/scripts/embedding-benchmark/.venv/bin/python",
+  "cSpell.words": [
+    "DISCOGS",
+    "freqshow",
+    "MUSICBRAINZ"
+  ]
 }

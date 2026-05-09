@@ -250,6 +250,12 @@ type LifeSpan struct {
 - Avoid scraping or republishing proprietary reviews without permission
 - Consider using AI to **summarize** existing reviews, not reproduce them verbatim
 
+### Discovery Pipeline Implementation Note (2026-05-08)
+
+- Added hosted provider clients for Voyage/OpenAI/Hugging Face embeddings and Hugging Face/OpenAI/Anthropic chat completion.
+- Added `pkg/discovery` for interpretation, natural-language album embedding text, cosine + MMR retrieval, curation validation, and the service orchestrator.
+- Added `POST /discover`, lazy best-effort album embedding, `cmd/reindex`, OpenAPI types, and the Angular `/discover` route.
+
 ---
 
 ## 9. Summary

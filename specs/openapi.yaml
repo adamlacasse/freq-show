@@ -16,6 +16,7 @@ tags:
   - name: Search
   - name: Artists
   - name: Albums
+  - name: Discovery
 
 paths:
   /healthz:
@@ -102,6 +103,45 @@ paths:
                 failed:
                   value:
                     error: search failed
+
+  /discover:
+    post:
+      tags: [Discovery]
+      summary: Discover albums from a natural-language listening request
+      operationId: discoverAlbums
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscoveryQuery'
+      responses:
+        '200':
+          description: Discovery recommendations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoveryResult'
+        '400':
+          description: Invalid request body or query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Discovery provider failure or invalid LLM output
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Discovery unavailable or index not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
 
   /artists/{id}:
     get:
@@ -291,6 +331,83 @@ components:
             type: string
         lifeSpan:
           $ref: '#/components/schemas/LifeSpan'
+
+    DiscoveryQuery:
+      type: object
+      additionalProperties: false
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        alreadyKnown:
+          type: array
+          items:
+            type: string
+
+    InterpretedQuery:
+      type: object
+      additionalProperties: false
+      required: [mood, eraHints, sonicQualities, referenceArtists, avoid, discoveryAppetite]
+      properties:
+        mood:
+          type: string
+        eraHints:
+          type: array
+          items:
+            type: string
+        sonicQualities:
+          type: array
+          items:
+            type: string
+        referenceArtists:
+          type: array
+          items:
+            type: string
+        avoid:
+          type: array
+          items:
+            type: string
+        discoveryAppetite:
+          type: string
+          enum: [low, medium, high]
+
+    DiscoveryPick:
+      type: object
+      additionalProperties: false
+      required: [rank, albumId, title, artistName, year, whyItFits, whatToListenFor, spotifySearchUrl]
+      properties:
+        rank:
+          type: integer
+          minimum: 1
+          maximum: 5
+        albumId:
+          type: string
+        title:
+          type: string
+        artistName:
+          type: string
+        year:
+          type: integer
+        whyItFits:
+          type: string
+        whatToListenFor:
+          type: string
+        spotifySearchUrl:
+          type: string
+
+    DiscoveryResult:
+      type: object
+      additionalProperties: false
+      required: [interpreted, picks]
+      properties:
+        interpreted:
+          $ref: '#/components/schemas/InterpretedQuery'
+        picks:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscoveryPick'
 
     Artist:
       type: object

@@ -19,6 +19,7 @@ type ArtistRepository interface {
 type AlbumRepository interface {
 	GetAlbum(ctx context.Context, id string) (*data.Album, error)
 	SaveAlbum(ctx context.Context, album *data.Album) error
+	ListAlbumsMissingEmbedding(ctx context.Context, model string, limit int) ([]data.Album, error)
 }
 
 // EmbeddingRepository defines persistence operations for album embedding vectors.
@@ -126,6 +127,28 @@ func (s *MemoryStore) SaveAlbum(ctx context.Context, album *data.Album) error {
 	defer s.mu.Unlock()
 	s.albums[album.ID] = cloneAlbum(album)
 	return nil
+}
+
+// ListAlbumsMissingEmbedding returns albums that do not yet have an embedding
+// row for the supplied model. A non-positive limit means no limit.
+func (s *MemoryStore) ListAlbumsMissingEmbedding(ctx context.Context, model string, limit int) ([]data.Album, error) {
+	_ = ctx
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var albums []data.Album
+	for id, album := range s.albums {
+		if byModel, ok := s.embeddings[model]; ok {
+			if _, exists := byModel[id]; exists {
+				continue
+			}
+		}
+		albums = append(albums, *cloneAlbum(album))
+		if limit > 0 && len(albums) >= limit {
+			break
+		}
+	}
+	return albums, nil
 }
 
 func cloneArtist(src *data.Artist) *data.Artist {

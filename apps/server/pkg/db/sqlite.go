@@ -153,6 +153,50 @@ func (s *SQLiteStore) SaveAlbum(ctx context.Context, album *data.Album) error {
 	return nil
 }
 
+// ListAlbumsMissingEmbedding returns cached albums without an embedding row
+// for the supplied model. A non-positive limit means no limit.
+func (s *SQLiteStore) ListAlbumsMissingEmbedding(ctx context.Context, model string, limit int) ([]data.Album, error) {
+	if strings.TrimSpace(model) == "" {
+		return nil, errors.New("db: embedding model required")
+	}
+
+	query := `SELECT albums.payload
+        FROM albums
+        LEFT JOIN album_embeddings
+          ON album_embeddings.mbid = albums.id
+         AND album_embeddings.model = ?
+        WHERE album_embeddings.mbid IS NULL
+        ORDER BY albums.updated_at ASC`
+	args := []any{model}
+	if limit > 0 {
+		query += ` LIMIT ?`
+		args = append(args, limit)
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("db: query albums missing embeddings: %w", err)
+	}
+	defer rows.Close()
+
+	var albums []data.Album
+	for rows.Next() {
+		var payload string
+		if err := rows.Scan(&payload); err != nil {
+			return nil, fmt.Errorf("db: scan album payload: %w", err)
+		}
+		var album data.Album
+		if err := json.Unmarshal([]byte(payload), &album); err != nil {
+			return nil, fmt.Errorf("db: decode album payload: %w", err)
+		}
+		albums = append(albums, album)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("db: iterate albums missing embeddings: %w", err)
+	}
+	return albums, nil
+}
+
 func (s *SQLiteStore) migrate(ctx context.Context) error {
 	const createArtists = `CREATE TABLE IF NOT EXISTS artists (
         id TEXT PRIMARY KEY,

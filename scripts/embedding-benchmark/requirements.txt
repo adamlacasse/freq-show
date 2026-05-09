@@ -1,4 +1,0 @@
-numpy>=1.26
-openai>=1.30
-huggingface_hub>=0.24
-voyageai>=0.2
