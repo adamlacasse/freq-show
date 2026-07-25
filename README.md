@@ -160,10 +160,16 @@ You can test the backend endpoints directly:
  curl http://localhost:8080/artists/5b11f4ce-a62d-471e-81fc-a69a8278c7da   # Nirvana with biography, genres, full discography
  curl http://localhost:8080/albums/1b022e01-4da6-387b-8658-8678046e4cef   # Nevermind with all 12 tracks
  curl "http://localhost:8080/search?q=beatles&limit=5"                     # Search artists with rich metadata
+ curl -X POST http://localhost:8080/discover \
+   -H "Content-Type: application/json" \
+   -d '{"query":"saturday morning coffee, jazzy but modern, nothing harsh"}'
  
  # Via frontend proxy (matches production):
  curl http://localhost:4200/api/healthz
  curl http://localhost:4200/api/artists/5b11f4ce-a62d-471e-81fc-a69a8278c7da
+ curl -X POST http://localhost:4200/api/discover \
+   -H "Content-Type: application/json" \
+   -d '{"query":"saturday morning coffee, jazzy but modern, nothing harsh"}'
  ```
 
  **Sample Response** (artist with biography and genres):
@@ -178,6 +184,33 @@ You can test the backend endpoints directly:
   "albums": [
    {"id": "1b022e01-4da6-387b-8658-8678046e4cef", "title": "Nevermind", "year": 1991},
    {"id": "7c3218b7-75e0-4e8c-971f-f097b6c308c5", "title": "In Utero", "year": 1993}
+  ]
+ }
+ ```
+
+ **Sample Response** (`POST /discover`):
+
+ ```json
+ {
+  "interpreted": {
+    "mood": "relaxed and caffeinated, bright without being harsh",
+    "eraHints": [],
+    "sonicQualities": ["modern", "jazzy", "warm", "smooth"],
+    "referenceArtists": [],
+    "avoid": ["harsh", "dissonant", "aggressive"],
+    "discoveryAppetite": "medium"
+  },
+  "picks": [
+    {
+      "rank": 1,
+      "albumId": "<mbid>",
+      "title": "Vespertine",
+      "artistName": "Björk",
+      "year": 2001,
+      "whyItFits": "...",
+      "whatToListenFor": "...",
+      "spotifySearchUrl": "https://open.spotify.com/search/Vespertine%20Björk"
+    }
   ]
  }
  ```

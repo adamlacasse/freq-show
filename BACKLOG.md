@@ -1,10 +1,15 @@
 # Backlog
 
+## Shipped
+
+- **AI music discovery pipeline** — All 7 phases complete as of 2026-07-25. Natural-language listening requests resolved to ranked album recommendations with editorial reasoning, via Voyage embeddings + HF Inference LLM. Architecture in [`docs/adr/0001-discovery-pipeline-hosting.md`](docs/adr/0001-discovery-pipeline-hosting.md); implementation detail in [`docs/plans/discovery-pipeline-plan.md`](docs/plans/discovery-pipeline-plan.md). To run the real-key smoke test: `DISCOVERY_E2E=1 DISCOVERY_EMBEDDINGS_API_KEY=<key> DISCOVERY_LLM_API_KEY=<key> go test ./pkg/discovery/ -run TestDiscoveryE2E -v -timeout 120s`.
+
+## Downstream (ride on `album_embeddings` table)
+
+- **Related Artists** — Artist-level embeddings for "you might also like" suggestions. Foundation is in place; pick up when discovery is confirmed working in production.
+- **Themed browsing** — Genre-prototype embeddings for mood/era-based browsing. Same table, same interface.
+
 ## In Progress
-
-- **AI music discovery pipeline** — Natural-language listening requests (e.g., "Saturday morning coffee, jazzy but modern, nothing harsh") resolved to ranked album recommendations with editorial reasoning. Architectural decision in [`docs/adr/0001-discovery-pipeline-hosting.md`](docs/adr/0001-discovery-pipeline-hosting.md) (Option C: hosted embeddings via Voyage + HF Inference free tier for LLM, behind swappable Go interfaces). Implementation plan in [`docs/plans/discovery-pipeline-plan.md`](docs/plans/discovery-pipeline-plan.md). **Status as of 2026-05-08: Phases 1-6 complete; documentation and any real-key smoke testing are next.** See the plan's Status section for the full progress map.
-
-  - **Related Artists** and **themed browsing** are downstream backlog items that can ride on the same `album_embeddings` table once the discovery pipeline is shipping. Worth picking up after Phase 6 closes.
 
 ## UI
 
