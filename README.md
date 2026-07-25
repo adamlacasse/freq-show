@@ -72,7 +72,7 @@ See `agent-context/development-log.md` for a chronological narrative of how thes
 
 3. **Configure Environment**
 
- - Copy .env.example to .env and update any necessary values (e.g., Discogs API credentials)
+ - Copy `.env.example` to `.env` (repo root) and update any necessary values (e.g., Discogs API credentials)
  - No further action needed - the run script will load it automatically
 
 4. **Quick Start Script**

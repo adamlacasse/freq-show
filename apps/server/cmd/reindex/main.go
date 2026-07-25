@@ -72,30 +72,55 @@ func run(limit int, dryRun bool, pruneOld bool) error {
 		return nil
 	}
 
-	processed := 0
+	// Collect texts, skipping thin albums, preserving album ID order.
+	type candidate struct {
+		id   string
+		text string
+	}
+	var candidates []candidate
 	skipped := 0
 	for _, album := range albums {
-		select {
-		case <-ctx.Done():
-			log.Printf("discovery reindex: interrupted after %d processed, %d skipped", processed, skipped)
-			return nil
-		default:
-		}
-
 		text := discovery.BuildAlbumEmbeddingText(&album, nil)
 		if text == "" {
 			skipped++
 			log.Printf("discovery reindex: skipping thin album %s", album.ID)
 			continue
 		}
-		vec, err := embedder.EncodeBatch(ctx, []string{text})
-		if err != nil {
-			return err
+		candidates = append(candidates, candidate{id: album.ID, text: text})
+	}
+
+	if len(candidates) == 0 {
+		log.Printf("discovery reindex: no embeddable albums found")
+		return nil
+	}
+
+	select {
+	case <-ctx.Done():
+		log.Printf("discovery reindex: interrupted before embedding")
+		return nil
+	default:
+	}
+
+	texts := make([]string, len(candidates))
+	for i, c := range candidates {
+		texts[i] = c.text
+	}
+
+	log.Printf("discovery reindex: embedding %d albums in one batch", len(texts))
+	vecs, err := embedder.EncodeBatch(ctx, texts)
+	if err != nil {
+		return err
+	}
+	if len(vecs) != len(candidates) {
+		return dbErr("embedding provider returned wrong number of vectors")
+	}
+
+	processed := 0
+	for i, c := range candidates {
+		if len(vecs[i]) == 0 {
+			return dbErr("embedding provider returned empty vector for album " + c.id)
 		}
-		if len(vec) != 1 || len(vec[0]) == 0 {
-			return dbErr("embedding provider returned no vector")
-		}
-		if err := store.SaveEmbedding(ctx, album.ID, embedder.Model(), vec[0]); err != nil {
+		if err := store.SaveEmbedding(ctx, c.id, embedder.Model(), vecs[i]); err != nil {
 			return err
 		}
 		processed++
