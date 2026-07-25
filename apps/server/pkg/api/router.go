@@ -55,7 +55,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	mux.Handle("/artists/", artistLookupHandler(cfg.Artists, cfg.MusicBrainz, cfg.Wikipedia))
 	mux.Handle("/albums/", albumLookupHandler(cfg.Albums, cfg.Embeddings, cfg.Embedder, cfg.MusicBrainz, cfg.Reviews))
 	mux.HandleFunc("/search", searchHandler(cfg.MusicBrainz))
-	mux.HandleFunc("/discover", discoverHandler(cfg.Discovery))
+	mux.Handle("/discover", discoverRateLimit(newDiscoverLimiter(), discoverHandler(cfg.Discovery)))
 	return corsMiddleware(mux)
 }
 
@@ -201,7 +201,7 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, mbClient Mu
 				}
 			}
 
-			if (artist.Related == nil || len(artist.Related) == 0) && mbClient != nil {
+			if len(artist.Related) == 0 && mbClient != nil {
 				if remoteArtist, err := mbClient.LookupArtist(ctx, id); err == nil {
 					related := transformRelatedArtists(remoteArtist.Relations)
 					if len(related) > 0 {
@@ -212,7 +212,7 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, mbClient Mu
 			}
 
 			// If cached artist has no albums, fetch them.
-			if artist.Albums == nil || len(artist.Albums) == 0 {
+			if len(artist.Albums) == 0 {
 				if mbClient != nil {
 					releaseGroups, err := mbClient.GetArtistReleaseGroups(ctx, id, 50, 0)
 					if err == nil {
