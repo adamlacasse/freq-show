@@ -24,11 +24,11 @@ describe('HomeComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should describe the current product instead of a roadmap', () => {
+  it('should render the listener entrance without extra sections', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('What is live now');
-    expect(compiled.textContent).toContain('Current sources');
-    expect(compiled.textContent).not.toContain('Build roadmap');
+    expect(compiled.textContent).toContain('Deep cuts, no ads.');
+    expect(compiled.querySelectorAll('section').length).toBe(1);
+    expect(Array.from(compiled.querySelectorAll('a[target="_blank"]')).length).toBe(0);
   });
 });

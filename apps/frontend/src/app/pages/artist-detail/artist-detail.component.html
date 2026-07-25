@@ -121,7 +121,7 @@
               <path d="M13 3h8v8h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H13V3z"></path>
             </svg>
             <a [href]="artist.biographyUrl" target="_blank" rel="noopener" class="text-freq-teal transition hover:text-freq-teal/80">
-              Read the Wikipedia source
+              Read on Wikipedia
             </a>
           </span>
           <ng-template #wikipediaLabel>
@@ -129,7 +129,7 @@
               <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path>
               </svg>
-              Information sourced from Wikipedia
+              Bio via Wikipedia
             </span>
           </ng-template>
         </div>
@@ -141,7 +141,7 @@
           </svg>
           <div>
             <p class="font-medium text-sm">No biography available</p>
-            <p class="text-xs mt-1">We couldn't find biographical information for this artist in our sources.</p>
+            <p class="text-xs mt-1">No biography yet for this artist.</p>
           </div>
         </div>
       </ng-template>
@@ -153,7 +153,7 @@
         <svg class="h-5 w-5 text-freq-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v2h4a1 1 0 0 1 0 2h-1v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6H3a1 1 0 0 1 0-2h4zM9 3v1h6V3H9zm-2 3v13h10V6H7zm3 3h4a1 1 0 0 1 0 2h-4a1 1 0 0 1 0-2z"></path>
         </svg>
-        <h2 class="text-xl font-semibold text-white">Genres & Tags</h2>
+        <h2 class="text-xl font-semibold text-white">Genres</h2>
       </div>
       <div *ngIf="artist.genres && artist.genres.length > 0; else noGenres" class="space-y-3">
         <div class="flex flex-wrap gap-2">
@@ -179,7 +179,7 @@
             <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path>
             </svg>
-            Genre data sourced from MusicBrainz community tags
+            Genres via MusicBrainz
           </span>
         </div>
       </div>
@@ -190,7 +190,7 @@
           </svg>
           <div>
             <p class="font-medium text-sm">No genre information available</p>
-            <p class="text-xs mt-1">Genre tags haven't been assigned to this artist yet in our database.</p>
+            <p class="text-xs mt-1">No genres listed for this artist yet.</p>
           </div>
         </div>
       </ng-template>
@@ -247,7 +247,7 @@
       </div>
     </div>
     <ng-template #noAlbums>
-      <p class="text-freq-cream/50 italic">Album information is not available for this artist.</p>
+      <p class="text-freq-cream/50 italic">No albums listed for this artist yet.</p>
     </ng-template>
   </div>
 

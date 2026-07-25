@@ -23,7 +23,7 @@
     @if ((apiStatus.status$ | async) === 'waking') {
       <div class="flex items-center justify-center gap-2 border-b border-freq-rose/40 bg-freq-rose/20 px-6 py-3 text-sm font-medium text-freq-rose backdrop-blur">
         <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-freq-rose"></span>
-        Service is waking up — first request may be slow.
+        Just a moment — pulling the first record off the shelf.
       </div>
     }
 
@@ -34,7 +34,7 @@
     <footer class="border-t border-white/5 bg-freq-midnight/60 backdrop-blur">
       <div class="mx-auto flex w-full max-w-6xl flex-col gap-2 px-6 py-8 text-xs text-freq-cream/60 md:flex-row md:items-center md:justify-between">
         <span>FreqShow - for those who still read liner notes.</span>
-        <span>Current sources: MusicBrainz, Wikipedia, and Discogs.</span>
+        <span>Music data via MusicBrainz, Wikipedia, and Discogs.</span>
       </div>
     </footer>
   </div>

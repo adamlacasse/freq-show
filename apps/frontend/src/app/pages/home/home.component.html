@@ -1,5 +1,5 @@
 <section class="relative overflow-hidden border-b border-white/5 bg-freq-midnight/40">
-	<div class="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-20 lg:flex-row lg:items-end">
+	<div class="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-20">
 		<div class="max-w-2xl">
 			<p class="text-xs uppercase tracking-[0.4em] text-freq-cream/60">{{ hero.eyebrow }}</p>
 			<h1 class="mt-4 text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
@@ -10,66 +10,7 @@
 			</p>
 			<div class="mt-10">
 				<app-search></app-search>
-				<div class="mt-6 flex flex-wrap items-center justify-center gap-4">
-					<a href="https://musicbrainz.org/doc/MusicBrainz_API" target="_blank" rel="noopener" class="rounded-full border border-freq-rose/30 bg-freq-rose/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-freq-rose">
-						Source data: MusicBrainz
-					</a>
-					<a href="https://en.wikipedia.org/api/rest_v1/" target="_blank" rel="noopener" class="rounded-full border border-freq-teal/30 bg-freq-teal/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-freq-teal">
-						Biographies: Wikipedia
-					</a>
-				</div>
 			</div>
 		</div>
-		<div class="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-freq-cream/80 shadow-freq-card backdrop-blur">
-			<p class="font-semibold uppercase tracking-wide text-freq-cream/70">What is live now</p>
-			<ul class="mt-4 space-y-3 text-freq-cream/70">
-				<li class="flex items-start gap-3">
-					<span class="mt-1 h-2 w-2 rounded-full bg-freq-teal"></span>
-					<span>Artist search with aliases, country, type, and life span metadata.</span>
-				</li>
-				<li class="flex items-start gap-3">
-					<span class="mt-1 h-2 w-2 rounded-full bg-freq-rose"></span>
-					<span>Artist pages with biographies, genres, and chronological album lists.</span>
-				</li>
-				<li class="flex items-start gap-3">
-					<span class="mt-1 h-2 w-2 rounded-full bg-freq-amber"></span>
-					<span>Album pages with track listings, release details, and review data when available.</span>
-				</li>
-			</ul>
-		</div>
-	</div>
-</section>
-
-<section class="mx-auto max-w-6xl px-6 py-16">
-	<div class="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-		<div>
-			<h2 class="text-3xl font-semibold tracking-tight text-white">Core experiences</h2>
-			<p class="mt-2 max-w-2xl text-base text-freq-cream/70">
-				The app centers on the parts that are already working end to end.
-			</p>
-		</div>
-	</div>
-	<div class="mt-10 grid gap-6 md:grid-cols-3">
-		@for (item of highlights; track item.title) {
-			<article class="rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-freq-cream/80 shadow-freq-card transition hover:border-white/20 hover:bg-white/10">
-				<h3 class="text-xl font-semibold text-white">{{ item.title }}</h3>
-				<p class="mt-3 text-sm leading-relaxed">{{ item.description }}</p>
-			</article>
-		}
-	</div>
-</section>
-
-<section class="mx-auto max-w-6xl px-6 pb-24">
-	<h2 class="text-3xl font-semibold tracking-tight text-white">Current sources</h2>
-	<p class="mt-2 max-w-2xl text-base text-freq-cream/70">
-		FreqShow stitches together open data sources that match the app's current scope.
-	</p>
-	<div class="mt-10 grid gap-6 md:grid-cols-3">
-		@for (source of sources; track source.title) {
-			<article class="rounded-3xl border border-white/10 bg-white/[0.02] p-6 text-freq-cream/80 transition hover:border-white/25 hover:bg-white/10">
-				<h3 class="text-xl font-semibold text-white">{{ source.title }}</h3>
-				<p class="mt-3 text-sm leading-relaxed">{{ source.description }}</p>
-			</article>
-		}
 	</div>
 </section>

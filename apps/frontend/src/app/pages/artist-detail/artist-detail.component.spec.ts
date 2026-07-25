@@ -79,7 +79,7 @@ describe('ArtistDetailComponent', () => {
 
       httpMock.expectNone(`/api/artists/${artistId}`);
       expect(fixture.nativeElement.textContent).toContain('Test Artist');
-      expect(fixture.nativeElement.textContent).toContain('Read the Wikipedia source');
+      expect(fixture.nativeElement.textContent).toContain('Read on Wikipedia');
       expect(fixture.nativeElement.textContent).toContain('Related Artist');
     });
   });
@@ -130,7 +130,7 @@ describe('ArtistDetailComponent', () => {
 
       expect(artistService.getArtist).toHaveBeenCalledTimes(2);
       expect(fixture.nativeElement.textContent).toContain('Test Artist');
-      expect(fixture.nativeElement.textContent).toContain('Read the Wikipedia source');
+      expect(fixture.nativeElement.textContent).toContain('Read on Wikipedia');
     });
   });
 });

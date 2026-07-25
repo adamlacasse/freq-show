@@ -89,7 +89,7 @@
 
         <!-- Secondary Types -->
         <div *ngIf="album.secondaryTypes && album.secondaryTypes.length > 0" class="mt-4">
-          <div class="text-xs text-freq-cream/50 mb-2">Additional classifications:</div>
+          <div class="text-xs text-freq-cream/50 mb-2">Also classified as:</div>
           <div class="flex flex-wrap gap-2">
             <span
               *ngFor="let type of album.secondaryTypes"
@@ -131,7 +131,7 @@
         </div>
       </div>
       <ng-template #noTracks>
-        <p class="text-freq-cream/50 italic">Track listing is not available for this album.</p>
+        <p class="text-freq-cream/50 italic">No tracks listed for this album yet.</p>
       </ng-template>
     </div>
 
@@ -162,25 +162,25 @@
         </div>
       </div>
       <ng-template #noReviews>
-        <p class="text-freq-cream/50 italic">Reviews are not available for this album.</p>
+        <p class="text-freq-cream/50 italic">No review yet for this album.</p>
       </ng-template>
     </div>
   </div>
 
-  <!-- Release Information -->
+  <!-- Release Details -->
   <div class="mt-8 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-    <h2 class="mb-4 text-xl font-semibold text-white">Release Information</h2>
+    <h2 class="mb-4 text-xl font-semibold text-white">Release details</h2>
     <div class="grid gap-4 sm:grid-cols-2">
       <div *ngIf="album.firstReleaseDate">
-        <div class="text-xs text-freq-cream/50 mb-1">First Release Date</div>
+        <div class="text-xs text-freq-cream/50 mb-1">First released</div>
         <div class="text-freq-cream">{{ album.firstReleaseDate }}</div>
       </div>
       <div *ngIf="album.primaryType">
-        <div class="text-xs text-freq-cream/50 mb-1">Release Type</div>
+        <div class="text-xs text-freq-cream/50 mb-1">Type</div>
         <div class="text-freq-cream">{{ album.primaryType }}</div>
       </div>
       <div *ngIf="album.label && album.label.trim()">
-        <div class="text-xs text-freq-cream/50 mb-1">Record Label</div>
+        <div class="text-xs text-freq-cream/50 mb-1">Label</div>
         <div class="text-freq-cream">{{ album.label }}</div>
       </div>
       <div *ngIf="album.genre && album.genre.trim()">
