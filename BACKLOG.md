@@ -17,6 +17,10 @@
 
 - **Expand frontend test coverage** — Coverage is better than the initial MVP, but service-level tests are still missing for `ArtistService` and `AlbumService`, and the UI specs can go deeper on loading states, template rendering, and service interactions.
 
+## Auth / Personalization
+
+- **Magic link authentication** — Passwordless email login to unlock personalization and tighten discovery cost protection beyond IP rate limiting. Stack fits existing infrastructure: `users` and `sessions` tables in SQLite, `POST /auth/request` sends a time-limited token link via Resend (free tier), `GET /auth/verify?token=...` creates a session cookie. Start with protecting `/discover` behind optional login; anonymous users still get the IP rate limit. Once sessions exist, query history, saved picks, and preference memory are natural follow-ons.
+
 ## Data / Integrations
 
 - **Rethink Discogs usage** — The Reviews section currently pulls data from Discogs, which surfaces pressing-specific detail (format, label, catalog number, etc.) rather than general album information. Evaluate whether Discogs is the right source for this use case, or whether a different data source or a narrower Discogs query would better serve the app's goals.
