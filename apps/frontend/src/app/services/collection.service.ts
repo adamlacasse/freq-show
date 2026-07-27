@@ -9,6 +9,8 @@ export interface CollectionItem {
   albumId: string;
   format: string;
   customArtistName?: string;
+  customTitle?: string;
+  customYear?: number;
   addedAt: string;
   album?: components['schemas']['Album'];
 }
@@ -29,8 +31,20 @@ export class CollectionService {
     return this.http.post(`${this.apiUrl}/collections/${userId}/albums/${albumId}`, { format });
   }
 
-  updateCollectionItem(userId: string, albumId: string, format: string, customArtistName?: string): Observable<any> {
-    return this.http.patch(`${this.apiUrl}/collections/${userId}/albums/${albumId}`, { format, customArtistName });
+  updateCollectionItem(
+    userId: string, 
+    albumId: string, 
+    format: string, 
+    customArtistName?: string,
+    customTitle?: string,
+    customYear?: number
+  ): Observable<any> {
+    return this.http.patch(`${this.apiUrl}/collections/${userId}/albums/${albumId}`, { 
+      format, 
+      customArtistName,
+      customTitle,
+      customYear
+    });
   }
 
   removeAlbumFromCollection(userId: string, albumId: string): Observable<any> {

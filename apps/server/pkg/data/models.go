@@ -65,6 +65,8 @@ type CollectionItem struct {
 	AlbumID          string `json:"albumId"`
 	Format           string `json:"format"`
 	CustomArtistName string `json:"customArtistName,omitempty"`
+	CustomTitle      string `json:"customTitle,omitempty"`
+	CustomYear       int    `json:"customYear,omitempty"`
 	AddedAt          string `json:"addedAt"`
 	Album            *Album `json:"album,omitempty"`
 }

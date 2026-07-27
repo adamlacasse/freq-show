@@ -163,10 +163,12 @@ func collectionHandler(repo db.CollectionRepository) http.Handler {
 				var req struct {
 					Format           string `json:"format"`
 					CustomArtistName string `json:"customArtistName"`
+					CustomTitle      string `json:"customTitle"`
+					CustomYear       int    `json:"customYear"`
 				}
 				_ = json.NewDecoder(r.Body).Decode(&req)
 				
-				err := repo.UpdateCollectionItem(r.Context(), userID, albumID, req.Format, req.CustomArtistName)
+				err := repo.UpdateCollectionItem(r.Context(), userID, albumID, req.Format, req.CustomArtistName, req.CustomTitle, req.CustomYear)
 				if err != nil {
 					writeJSON(w, http.StatusInternalServerError, errorResponse{"failed to update collection item"})
 					return

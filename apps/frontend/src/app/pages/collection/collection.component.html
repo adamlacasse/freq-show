@@ -25,8 +25,19 @@
       [(ngModel)]="searchTerm" 
       (ngModelChange)="filterCollection()"
       placeholder="Filter by artist or album title..." 
-      class="w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-10 pr-4 py-3 text-white placeholder:text-freq-cream/40 focus:border-freq-teal/70 focus:outline-none focus:ring-1 focus:ring-freq-teal/70 transition"
+      class="w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-10 pr-10 py-3 text-white placeholder:text-freq-cream/40 focus:border-freq-teal/70 focus:outline-none focus:ring-1 focus:ring-freq-teal/70 transition"
     >
+    <button 
+      *ngIf="searchTerm" 
+      (click)="clearSearch()" 
+      class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-freq-cream/50 hover:text-white transition"
+      title="Clear search"
+      type="button"
+    >
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+      </svg>
+    </button>
   </div>
 
   <!-- Loading State -->
@@ -53,37 +64,87 @@
             <svg class="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
           </div>
         </a>
-        <div class="flex-1">
-          <a [routerLink]="['/albums', item.albumId]" class="text-lg font-semibold text-white hover:text-freq-teal transition line-clamp-1" [title]="item.album?.title">{{ item.album?.title || 'Unknown Album' }}</a>
-          
+        <div class="flex-1 group/card">
           <!-- Normal View -->
-          <div *ngIf="editingItemId !== item.id" class="group/artist mt-1 flex items-center justify-between gap-1">
-            <p class="text-sm text-freq-cream/70 line-clamp-1" [title]="item.customArtistName || item.album?.artistName">
+          <div *ngIf="editingItemId !== item.id">
+            <div class="flex items-start justify-between gap-1">
+              <a [routerLink]="['/albums', item.albumId]" class="text-lg font-semibold text-white hover:text-freq-teal transition line-clamp-1" [title]="item.customTitle || item.album?.title">
+                {{ item.customTitle || item.album?.title || 'Unknown Album' }}
+                <span *ngIf="item.customTitle" class="ml-1 text-[10px] text-freq-teal/70 font-normal" title="Custom title override">(custom)</span>
+              </a>
+              <button (click)="startEditing(item, $event)" title="Edit album details" class="opacity-60 sm:opacity-0 sm:group-hover/card:opacity-100 p-1.5 text-freq-cream/60 hover:text-freq-teal transition shrink-0">
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+              </button>
+            </div>
+            
+            <p class="mt-1 text-sm text-freq-cream/70 line-clamp-1" [title]="item.customArtistName || item.album?.artistName">
               {{ item.customArtistName || item.album?.artistName || 'Unknown Artist' }}
               <span *ngIf="item.customArtistName" class="ml-1 text-[10px] text-freq-teal/70" title="Custom artist name override">(custom)</span>
             </p>
-            <button (click)="startEditing(item, $event)" title="Edit artist name" class="opacity-60 sm:opacity-0 sm:group-hover/artist:opacity-100 p-1.5 text-freq-cream/60 hover:text-freq-teal transition">
-              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-            </button>
           </div>
 
           <!-- Edit Mode -->
-          <form *ngIf="editingItemId === item.id" (ngSubmit)="saveCustomArtist(item, $event)" class="mt-2 flex items-center gap-1.5" (click)="$event.stopPropagation()">
-            <input 
-              type="text" 
-              [(ngModel)]="editArtistName" 
-              name="editArtist"
-              placeholder="Artist name..."
-              class="w-full rounded-lg border border-freq-teal/50 bg-black/40 px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-freq-teal"
-              autoFocus
-            >
-            <button type="submit" title="Save" class="rounded-lg bg-freq-teal/20 px-2 py-1 text-xs font-semibold text-freq-teal hover:bg-freq-teal/30">✓</button>
-            <button type="button" (click)="cancelEditing($event)" title="Cancel" class="rounded-lg bg-white/10 px-2 py-1 text-xs text-freq-cream/60 hover:bg-white/20">✕</button>
+          <form *ngIf="editingItemId === item.id" (ngSubmit)="saveCollectionItem(item, $event)" class="mt-1 flex flex-col gap-2" (click)="$event.stopPropagation()">
+            <div>
+              <label class="text-[10px] uppercase tracking-wider text-freq-cream/50 block mb-0.5">Title</label>
+              <input 
+                type="text" 
+                [(ngModel)]="editTitle" 
+                name="editTitle"
+                placeholder="Album title..."
+                class="w-full rounded-lg border border-freq-teal/50 bg-black/40 px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-freq-teal"
+              >
+            </div>
+
+            <div>
+              <label class="text-[10px] uppercase tracking-wider text-freq-cream/50 block mb-0.5">Artist</label>
+              <input 
+                type="text" 
+                [(ngModel)]="editArtistName" 
+                name="editArtist"
+                placeholder="Artist name..."
+                class="w-full rounded-lg border border-freq-teal/50 bg-black/40 px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-freq-teal"
+              >
+            </div>
+
+            <div>
+              <label class="text-[10px] uppercase tracking-wider text-freq-cream/50 block mb-0.5">Release Year</label>
+              <input 
+                type="number" 
+                [(ngModel)]="editYear" 
+                name="editYear"
+                placeholder="e.g. 1971"
+                class="w-full rounded-lg border border-freq-teal/50 bg-black/40 px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-freq-teal"
+              >
+            </div>
+
+            <div class="flex items-center justify-end gap-1.5 mt-1">
+              <button type="button" (click)="cancelEditing($event)" class="rounded-lg bg-white/10 px-3 py-1 text-xs text-freq-cream/70 hover:bg-white/20">Cancel</button>
+              <button type="submit" class="rounded-lg bg-freq-teal px-3 py-1 text-xs font-semibold text-freq-ink hover:bg-freq-teal/90">Save</button>
+            </div>
           </form>
         </div>
+
         <div class="mt-4 flex items-center justify-between border-t border-white/10 pt-4">
           <span class="rounded-full bg-freq-teal/15 px-3 py-1 text-xs font-semibold text-freq-teal uppercase tracking-wide">{{ item.format }}</span>
-          <span class="text-xs text-freq-cream/40" [title]="'Added ' + item.addedAt">{{ item.addedAt | date:'MMM yyyy' }}</span>
+          
+          <!-- Clickable Year / Add Year Button -->
+          <button 
+            (click)="startEditing(item, $event)" 
+            class="text-xs transition hover:text-freq-teal flex items-center gap-1"
+            [title]="'Click to edit year. Current: ' + (item.customYear || item.album?.year || 'None')"
+          >
+            <ng-container *ngIf="item.customYear || item.album?.year">
+              <span class="text-freq-cream/70 font-medium">{{ item.customYear || item.album?.year }}</span>
+              <span *ngIf="item.customYear" class="text-[9px] text-freq-teal/80">(custom)</span>
+            </ng-container>
+            
+            <ng-container *ngIf="!item.customYear && !item.album?.year">
+              <span class="rounded-md border border-dashed border-white/20 px-2 py-0.5 text-[11px] text-freq-cream/50 hover:border-freq-teal/50 hover:text-freq-teal">
+                + Add Year
+              </span>
+            </ng-container>
+          </button>
         </div>
       </div>
     </div>

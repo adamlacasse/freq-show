@@ -8,8 +8,9 @@ import ssl
 # Paths and URLs
 SYNC_JSON_PATH = "../record-collection/sync_progress.json"
 MB_SEARCH_URL = "https://musicbrainz.org/ws/2/release-group/?query={}&fmt=json"
-FREQSHOW_ALBUM_URL = "http://localhost:8080/albums/{}"
-FREQSHOW_COLLECTION_URL = "http://localhost:8080/collections/adam/albums/{}"
+BASE_URL = sys.argv[1].rstrip('/') if len(sys.argv) > 1 else "http://localhost:8080"
+FREQSHOW_ALBUM_URL = f"{BASE_URL}/albums/{{}}"
+FREQSHOW_COLLECTION_URL = f"{BASE_URL}/collections/adam/albums/{{}}"
 USER_AGENT = "FreqShowSeeder/1.0 ( adamlacasse@example.com )"
 
 def main():

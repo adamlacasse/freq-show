@@ -21,6 +21,8 @@ export class CollectionComponent implements OnInit {
 
   editingItemId: number | null = null;
   editArtistName = '';
+  editTitle = '';
+  editYear: number | null = null;
 
   constructor(private collectionService: CollectionService) {}
 
@@ -53,10 +55,15 @@ export class CollectionComponent implements OnInit {
     }
 
     this.filteredCollection = this.collection.filter(item => {
-      const albumTitle = item.album?.title?.toLowerCase() || '';
+      const albumTitle = (item.customTitle || item.album?.title || '').toLowerCase();
       const artistName = (item.customArtistName || item.album?.artistName || '').toLowerCase();
       return albumTitle.includes(term) || artistName.includes(term);
     });
+  }
+
+  clearSearch(): void {
+    this.searchTerm = '';
+    this.filterCollection();
   }
 
   startEditing(item: CollectionItem, event: Event): void {
@@ -64,6 +71,8 @@ export class CollectionComponent implements OnInit {
     event.preventDefault();
     this.editingItemId = item.id;
     this.editArtistName = item.customArtistName || item.album?.artistName || '';
+    this.editTitle = item.customTitle || item.album?.title || '';
+    this.editYear = item.customYear || item.album?.year || null;
   }
 
   cancelEditing(event?: Event): void {
@@ -73,24 +82,34 @@ export class CollectionComponent implements OnInit {
     }
     this.editingItemId = null;
     this.editArtistName = '';
+    this.editTitle = '';
+    this.editYear = null;
   }
 
-  saveCustomArtist(item: CollectionItem, event: Event): void {
+  saveCollectionItem(item: CollectionItem, event: Event): void {
     event.stopPropagation();
     event.preventDefault();
-    const newName = this.editArtistName.trim();
-    // If user cleared custom name or set it equal to original, revert to undefined
-    const finalCustomName = (newName && newName !== item.album?.artistName) ? newName : '';
+    const newArtist = this.editArtistName.trim();
+    const newTitle = this.editTitle.trim();
+    const newYear = this.editYear ? Number(this.editYear) : 0;
 
-    this.collectionService.updateCollectionItem(this.userId, item.albumId, item.format, finalCustomName).subscribe({
+    const finalArtist = (newArtist && newArtist !== item.album?.artistName) ? newArtist : '';
+    const finalTitle = (newTitle && newTitle !== item.album?.title) ? newTitle : '';
+    const finalYear = (newYear && newYear !== item.album?.year) ? newYear : 0;
+
+    this.collectionService.updateCollectionItem(
+      this.userId, item.albumId, item.format, finalArtist, finalTitle, finalYear
+    ).subscribe({
       next: () => {
-        item.customArtistName = finalCustomName || undefined;
+        item.customArtistName = finalArtist || undefined;
+        item.customTitle = finalTitle || undefined;
+        item.customYear = finalYear || undefined;
         this.collection = this.sortCollection(this.collection);
         this.filterCollection();
         this.editingItemId = null;
       },
       error: (err) => {
-        console.error('Failed to update artist name:', err);
+        console.error('Failed to update collection item:', err);
       }
     });
   }
@@ -118,8 +137,8 @@ export class CollectionComponent implements OnInit {
       }
 
       // Secondary sort: Release Year (ascending)
-      const yearA = a.album.year || 0;
-      const yearB = b.album.year || 0;
+      const yearA = a.customYear || a.album.year || 0;
+      const yearB = b.customYear || b.album.year || 0;
       return yearA - yearB;
     });
   }
