@@ -22,7 +22,7 @@ type MusicBrainzClient interface {
 	LookupArtist(ctx context.Context, id string) (*musicbrainz.Artist, error)
 	LookupReleaseGroup(ctx context.Context, id string) (*musicbrainz.ReleaseGroup, error)
 	SearchArtists(ctx context.Context, query string, limit int, offset int) (*musicbrainz.SearchResult, error)
-	GetArtistReleaseGroups(ctx context.Context, artistID string, limit int, offset int) (*musicbrainz.ReleaseGroupSearchResult, error)
+	GetAllArtistReleaseGroups(ctx context.Context, artistID string) (*musicbrainz.ReleaseGroupSearchResult, error)
 	GetReleaseGroupTracks(ctx context.Context, releaseGroupID string) ([]musicbrainz.Track, error)
 }
 
@@ -308,7 +308,7 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, mbClient Mu
 			// If cached artist has no albums, fetch them.
 			if len(artist.Albums) == 0 {
 				if mbClient != nil {
-					releaseGroups, err := mbClient.GetArtistReleaseGroups(ctx, id, 50, 0)
+					releaseGroups, err := mbClient.GetAllArtistReleaseGroups(ctx, id)
 					if err == nil {
 						artist.Albums = transformReleaseGroupsToAlbums(releaseGroups.ReleaseGroups)
 						updated = true
@@ -351,7 +351,7 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, mbClient Mu
 	}
 
 	// Fetch artist's albums/release groups
-	releaseGroups, err := mbClient.GetArtistReleaseGroups(ctx, id, 50, 0)
+	releaseGroups, err := mbClient.GetAllArtistReleaseGroups(ctx, id)
 	if err != nil {
 		// Don't fail the artist lookup if albums can't be fetched
 		// Just log and continue with empty albums

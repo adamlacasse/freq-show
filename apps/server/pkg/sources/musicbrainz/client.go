@@ -699,6 +699,77 @@ func (c *Client) GetArtistReleaseGroups(ctx context.Context, artistID string, li
 	return transformReleaseGroupSearchResult(payload, artistID), nil
 }
 
+// releaseGroupPageSize is the MusicBrainz maximum page size for browse requests.
+const releaseGroupPageSize = 100
+
+// maxArtistReleaseGroups caps how many release groups we will accumulate for a
+// single artist. This bounds both memory and the number of upstream requests
+// for pathological cases; MusicBrainz's most prolific artists sit well under it.
+const maxArtistReleaseGroups = 1000
+
+// GetAllArtistReleaseGroups retrieves every release group for an artist by
+// paging through the browse endpoint until the reported total is reached.
+//
+// The previous single-call approach capped results at the first page, which
+// silently truncated prolific artists (Frank Zappa, David Bowie) to an
+// arbitrary subset — MusicBrainz's browse endpoint returns no meaningful
+// ordering, so the retained subset was effectively random.
+//
+// A failure on any page returns an error rather than the partial results
+// gathered so far. Callers cache what they receive, so returning a partial
+// discography would persist the truncation we are trying to fix.
+func (c *Client) GetAllArtistReleaseGroups(ctx context.Context, artistID string) (*ReleaseGroupSearchResult, error) {
+	trimmed := strings.TrimSpace(artistID)
+	if trimmed == "" {
+		return nil, errors.New("musicbrainz: artist id is required")
+	}
+
+	var (
+		all   []ReleaseGroup
+		seen  = make(map[string]struct{})
+		total int
+	)
+
+	for offset := 0; offset < maxArtistReleaseGroups; offset += releaseGroupPageSize {
+		page, err := c.GetArtistReleaseGroups(ctx, trimmed, releaseGroupPageSize, offset)
+		if err != nil {
+			return nil, err
+		}
+		if page == nil {
+			break
+		}
+
+		total = page.Count
+
+		// An empty page means we have run past the end of the collection.
+		// Guard on this as well as the count so a stale or inconsistent
+		// count cannot spin the loop.
+		if len(page.ReleaseGroups) == 0 {
+			break
+		}
+
+		// Deduplicate by ID: paging is not a consistent snapshot, so an
+		// edit upstream mid-crawl can surface the same group on two pages.
+		for _, rg := range page.ReleaseGroups {
+			if _, dup := seen[rg.ID]; dup {
+				continue
+			}
+			seen[rg.ID] = struct{}{}
+			all = append(all, rg)
+		}
+
+		if offset+len(page.ReleaseGroups) >= total {
+			break
+		}
+	}
+
+	return &ReleaseGroupSearchResult{
+		ReleaseGroups: all,
+		Count:         total,
+		Offset:        0,
+	}, nil
+}
+
 func (c *Client) getJSON(ctx context.Context, endpoint string, out any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {

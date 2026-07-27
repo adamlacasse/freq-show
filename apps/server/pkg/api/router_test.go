@@ -52,7 +52,7 @@ type stubMusicBrainz struct {
 	lookupArtistFunc           func(ctx context.Context, id string) (*musicbrainz.Artist, error)
 	lookupReleaseGroupFunc     func(ctx context.Context, id string) (*musicbrainz.ReleaseGroup, error)
 	searchArtistsFunc          func(ctx context.Context, query string, limit int, offset int) (*musicbrainz.SearchResult, error)
-	getArtistReleaseGroupsFunc func(ctx context.Context, artistID string, limit int, offset int) (*musicbrainz.ReleaseGroupSearchResult, error)
+	getArtistReleaseGroupsFunc func(ctx context.Context, artistID string) (*musicbrainz.ReleaseGroupSearchResult, error)
 	getReleaseGroupTracksFunc  func(ctx context.Context, releaseGroupID string) ([]musicbrainz.Track, error)
 }
 
@@ -77,9 +77,9 @@ func (s *stubMusicBrainz) SearchArtists(ctx context.Context, query string, limit
 	return nil, errors.New(unexpectedCall)
 }
 
-func (s *stubMusicBrainz) GetArtistReleaseGroups(ctx context.Context, artistID string, limit int, offset int) (*musicbrainz.ReleaseGroupSearchResult, error) {
+func (s *stubMusicBrainz) GetAllArtistReleaseGroups(ctx context.Context, artistID string) (*musicbrainz.ReleaseGroupSearchResult, error) {
 	if s.getArtistReleaseGroupsFunc != nil {
-		return s.getArtistReleaseGroupsFunc(ctx, artistID, limit, offset)
+		return s.getArtistReleaseGroupsFunc(ctx, artistID)
 	}
 	return &musicbrainz.ReleaseGroupSearchResult{}, nil
 }
@@ -256,7 +256,7 @@ func TestArtistLookupHandlerIncludesWikipediaSourceAndRelatedArtists(t *testing.
 				},
 			}, nil
 		},
-		getArtistReleaseGroupsFunc: func(ctx context.Context, artistID string, limit int, offset int) (*musicbrainz.ReleaseGroupSearchResult, error) {
+		getArtistReleaseGroupsFunc: func(ctx context.Context, artistID string) (*musicbrainz.ReleaseGroupSearchResult, error) {
 			return &musicbrainz.ReleaseGroupSearchResult{}, nil
 		},
 	}
