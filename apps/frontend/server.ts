@@ -13,13 +13,19 @@ export function app(): express.Express {
   const browserDistFolder = resolve(serverDistFolder, '../browser');
   const indexHtml = join(serverDistFolder, 'index.server.html');
 
+  const allowedHosts = [
+    'localhost',
+    'localhost:4000',
+    '127.0.0.1',
+    'freq-show.adamlacasse.dev',
+    'freq-show-frontend.onrender.com',
+  ];
+  if (process.env['RENDER_EXTERNAL_HOSTNAME']) {
+    allowedHosts.push(process.env['RENDER_EXTERNAL_HOSTNAME']);
+  }
+
   const commonEngine = new CommonEngine({
-    allowedHosts: [
-      'localhost',
-      'localhost:4000',
-      'freq-show.adamlacasse.dev',
-      'freq-show-frontend.onrender.com',
-    ],
+    allowedHosts,
   });
 
   server.set('trust proxy', 1);
@@ -27,7 +33,7 @@ export function app(): express.Express {
   server.set('views', browserDistFolder);
 
   // ---- API proxy ----
-  const apiTarget = process.env['API_BASE_URL'] || 'http://localhost:8080';
+  const apiTarget = process.env['API_BASE_URL'] || process.env['BACKEND_URL'] || 'http://localhost:8080';
 
   server.use(
     '/api',
@@ -35,6 +41,14 @@ export function app(): express.Express {
       target: apiTarget,
       changeOrigin: true,
       pathRewrite: { '^/api': '' },
+      on: {
+        error: (err: any, req: any, res: any) => {
+          console.error(`[API Proxy Error] Failed to proxy ${req.method} ${req.url} to ${apiTarget}:`, err);
+          if (res && !res.headersSent) {
+            res.status(502).json({ error: 'Backend proxy error', details: err.message });
+          }
+        }
+      }
     })
   );
 
