@@ -52,12 +52,23 @@ type RouterConfig struct {
 // NewRouter wires the top-level HTTP routes for the backend.
 func NewRouter(cfg RouterConfig) http.Handler {
 	mux := http.NewServeMux()
+
+	register := func(pattern string, handler http.Handler) {
+		mux.Handle(pattern, handler)
+		if pattern != "/healthz" {
+			mux.Handle("/api"+pattern, http.StripPrefix("/api", handler))
+		}
+	}
+
 	mux.HandleFunc("/healthz", healthHandler)
-	mux.Handle("/artists/", artistLookupHandler(cfg.Artists, cfg.MusicBrainz, cfg.Wikipedia))
-	mux.Handle("/albums/", albumLookupHandler(cfg.Albums, cfg.Embeddings, cfg.Embedder, cfg.MusicBrainz, cfg.Reviews))
-	mux.HandleFunc("/search", searchHandler(cfg.MusicBrainz))
-	mux.Handle("/discover", discoverRateLimit(newDiscoverLimiter(), discoverHandler(cfg.Discovery)))
-	mux.Handle("/collections/", collectionHandler(cfg.Collections))
+	mux.HandleFunc("/api/healthz", healthHandler)
+
+	register("/artists/", artistLookupHandler(cfg.Artists, cfg.MusicBrainz, cfg.Wikipedia))
+	register("/albums/", albumLookupHandler(cfg.Albums, cfg.Embeddings, cfg.Embedder, cfg.MusicBrainz, cfg.Reviews))
+	register("/search", searchHandler(cfg.MusicBrainz))
+	register("/discover", discoverRateLimit(newDiscoverLimiter(), discoverHandler(cfg.Discovery)))
+	register("/collections/", collectionHandler(cfg.Collections))
+
 	return corsMiddleware(mux)
 }
 
@@ -737,12 +748,15 @@ func parseSearchOffset(offsetStr string) int {
 	return 0
 }
 
-// corsMiddleware adds CORS headers for local development
+// corsMiddleware adds CORS headers for local development & production deployments
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Allow requests from Angular dev server
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4200")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			origin = "*"
+		}
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.Header().Set("Access-Control-Max-Age", "86400")
 
