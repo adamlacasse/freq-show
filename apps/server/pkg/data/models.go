@@ -1,6 +1,12 @@
 package data
 
 type Artist struct {
+	// CacheVersion records which generation of the fetch logic produced this
+	// record. Cached artists are otherwise never refreshed, so a payload
+	// written by an older, buggier fetch path would persist indefinitely.
+	// Bump the corresponding constant in the api package to force a refetch.
+	CacheVersion int `json:"cacheVersion,omitempty"`
+
 	ID             string          `json:"id"`
 	Name           string          `json:"name"`
 	Biography      string          `json:"biography"`

@@ -703,9 +703,20 @@ func (c *Client) GetArtistReleaseGroups(ctx context.Context, artistID string, li
 const releaseGroupPageSize = 100
 
 // maxArtistReleaseGroups caps how many release groups we will accumulate for a
-// single artist. This bounds both memory and the number of upstream requests
-// for pathological cases; MusicBrainz's most prolific artists sit well under it.
-const maxArtistReleaseGroups = 1000
+// single artist, bounding both memory and the number of upstream requests.
+//
+// The previous value of 1000 was set on the assumption that prolific artists
+// sat well under it. The Grateful Dead falsified that: 1049 album|ep release
+// groups, thanks to the Dick's Picks / Dave's Picks / Road Trips archive
+// series. Because browse ordering is arbitrary, exceeding the cap does not
+// drop "the obscure ones" — it drops a random slice, so a canonical album can
+// vanish while a bootleg volume survives.
+//
+// The ceiling is wall-clock, not memory: MusicBrainz requires ~1 request per
+// second, so each 100 release groups costs a little over a second of latency
+// on a cold fetch. At 3000 a worst-case artist takes ~33s to populate once,
+// then serves from cache. Raise it further only with that tradeoff in mind.
+const maxArtistReleaseGroups = 3000
 
 // GetAllArtistReleaseGroups retrieves every release group for an artist by
 // paging through the browse endpoint until the reported total is reached.

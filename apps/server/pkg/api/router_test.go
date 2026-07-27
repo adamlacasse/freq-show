@@ -147,6 +147,7 @@ func TestArtistLookupHandlerReturnsCachedArtist(t *testing.T) {
 		BiographyURL: "https://en.wikipedia.org/wiki/Cached",
 		Related:      []data.RelatedArtist{{ID: "related-1", Name: "Related Artist"}},
 		Albums:       []data.Album{{ID: "album-1", Title: "Cached Album"}},
+		CacheVersion: artistCacheVersion,
 	}
 
 	repo := &stubArtistRepo{
@@ -188,6 +189,110 @@ func TestArtistLookupHandlerReturnsCachedArtist(t *testing.T) {
 	}
 	if payload.Name != "Cached" {
 		t.Fatalf("expected cached artist name, got %q", payload.Name)
+	}
+}
+
+// A cache entry written by an older fetch path can hold a truncated
+// discography: non-empty, so an emptiness check leaves it alone, but missing
+// albums that will never come back without an explicit version bump. This is
+// how Reckoning went missing from the Grateful Dead page.
+func TestArtistLookupHandlerRefetchesStaleCacheVersion(t *testing.T) {
+	cached := &data.Artist{
+		ID:           testArtistID,
+		Name:         "Cached",
+		BiographyURL: "https://en.wikipedia.org/wiki/Cached",
+		Related:      []data.RelatedArtist{{ID: "related-1", Name: "Related Artist"}},
+		Albums:       []data.Album{{ID: "album-1", Title: "Truncated Album"}},
+		CacheVersion: artistCacheVersion - 1,
+	}
+
+	var savedVersion int
+	var savedAlbums int
+	repo := &stubArtistRepo{
+		getFunc: func(ctx context.Context, id string) (*data.Artist, error) {
+			return cached, nil
+		},
+		saveFunc: func(ctx context.Context, artist *data.Artist) error {
+			savedVersion = artist.CacheVersion
+			savedAlbums = len(artist.Albums)
+			return nil
+		},
+	}
+
+	mb := &stubMusicBrainz{
+		getArtistReleaseGroupsFunc: func(ctx context.Context, artistID string) (*musicbrainz.ReleaseGroupSearchResult, error) {
+			return &musicbrainz.ReleaseGroupSearchResult{
+				ReleaseGroups: []musicbrainz.ReleaseGroup{
+					{ID: "album-1", Title: "Truncated Album", PrimaryType: "Album"},
+					{ID: "album-2", Title: "Reckoning", PrimaryType: "Album", SecondaryTypes: []string{"Live"}},
+				},
+				Count: 2,
+			}, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, artistPath, nil)
+	res := httptest.NewRecorder()
+
+	artistLookupHandler(repo, mb, &stubWikipedia{}).ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf(status200Fmt, res.Code)
+	}
+
+	var payload data.Artist
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf(decodeErrFmt, err)
+	}
+	if len(payload.Albums) != 2 {
+		t.Fatalf("expected the refetched discography, got %d albums", len(payload.Albums))
+	}
+	if savedAlbums != 2 {
+		t.Fatalf("expected the refetched discography to be persisted, saved %d albums", savedAlbums)
+	}
+	if savedVersion != artistCacheVersion {
+		t.Fatalf("expected cache to be restamped to version %d, got %d", artistCacheVersion, savedVersion)
+	}
+}
+
+// A failed refetch must not stamp the stale payload as current, or one
+// upstream blip would freeze a truncated discography permanently.
+func TestArtistLookupHandlerKeepsStaleVersionWhenRefetchFails(t *testing.T) {
+	cached := &data.Artist{
+		ID:           testArtistID,
+		Name:         "Cached",
+		BiographyURL: "https://en.wikipedia.org/wiki/Cached",
+		Related:      []data.RelatedArtist{{ID: "related-1", Name: "Related Artist"}},
+		Albums:       []data.Album{{ID: "album-1", Title: "Truncated Album"}},
+		CacheVersion: artistCacheVersion - 1,
+	}
+
+	repo := &stubArtistRepo{
+		getFunc: func(ctx context.Context, id string) (*data.Artist, error) {
+			return cached, nil
+		},
+		saveFunc: func(ctx context.Context, artist *data.Artist) error {
+			if artist.CacheVersion >= artistCacheVersion {
+				t.Fatalf("stale cache stamped as current after a failed refetch")
+			}
+			return nil
+		},
+	}
+
+	mb := &stubMusicBrainz{
+		getArtistReleaseGroupsFunc: func(ctx context.Context, artistID string) (*musicbrainz.ReleaseGroupSearchResult, error) {
+			return nil, musicbrainz.ErrRateLimit
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, artistPath, nil)
+	res := httptest.NewRecorder()
+
+	artistLookupHandler(repo, mb, &stubWikipedia{}).ServeHTTP(res, req)
+
+	// The stale albums are still served — a degraded page beats a failed one.
+	if res.Code != http.StatusOK {
+		t.Fatalf(status200Fmt, res.Code)
 	}
 }
 
@@ -396,12 +501,13 @@ func TestArtistLookupHandlerNormalizesEmptySlices(t *testing.T) {
 	repo := &stubArtistRepo{
 		getFunc: func(ctx context.Context, id string) (*data.Artist, error) {
 			return &data.Artist{
-				ID:      id,
-				Name:    "Artist",
-				Genres:  nil,
-				Albums:  []data.Album{{ID: "album-1", Title: "Album 1", Tracks: nil, SecondaryTypes: nil}},
-				Related: nil,
-				Aliases: nil,
+				ID:           id,
+				Name:         "Artist",
+				Genres:       nil,
+				Albums:       []data.Album{{ID: "album-1", Title: "Album 1", Tracks: nil, SecondaryTypes: nil}},
+				Related:      nil,
+				Aliases:      nil,
+				CacheVersion: artistCacheVersion,
 				LifeSpan: data.LifeSpan{
 					Begin: "",
 				},

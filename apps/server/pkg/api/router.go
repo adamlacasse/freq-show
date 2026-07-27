@@ -17,6 +17,18 @@ import (
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/musicbrainz"
 )
 
+// artistCacheVersion identifies the current generation of the artist fetch
+// logic. A cached artist stamped with a lower version has its discography
+// refetched on next read, then restamped.
+//
+// Bump this whenever a change would make previously cached discographies wrong
+// or incomplete — the cache has no TTL, so nothing else will invalidate them.
+//
+// 1: paging via GetAllArtistReleaseGroups. Supersedes an earlier path that
+// fetched a single 50-item page, silently truncating every artist with a
+// larger catalogue to an arbitrary subset.
+const artistCacheVersion = 1
+
 // MusicBrainzClient captures the MusicBrainz operations the router relies on.
 type MusicBrainzClient interface {
 	LookupArtist(ctx context.Context, id string) (*musicbrainz.Artist, error)
@@ -305,14 +317,21 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, mbClient Mu
 				}
 			}
 
-			// If cached artist has no albums, fetch them.
-			if len(artist.Albums) == 0 {
+			// Refetch the discography when the cached copy is empty or was
+			// written by an older fetch path. Testing only for emptiness can
+			// heal a missing discography but never a truncated one, so a
+			// partial cache would otherwise survive every future deploy.
+			if len(artist.Albums) == 0 || artist.CacheVersion < artistCacheVersion {
 				if mbClient != nil {
 					releaseGroups, err := mbClient.GetAllArtistReleaseGroups(ctx, id)
 					if err == nil {
 						artist.Albums = transformReleaseGroupsToAlbums(releaseGroups.ReleaseGroups)
+						artist.CacheVersion = artistCacheVersion
 						updated = true
 					}
+					// On failure leave CacheVersion untouched so the next
+					// read retries rather than stamping a stale payload as
+					// current.
 				}
 			}
 			if updated {
@@ -354,10 +373,12 @@ func getOrFetchArtist(ctx context.Context, repo db.ArtistRepository, mbClient Mu
 	releaseGroups, err := mbClient.GetAllArtistReleaseGroups(ctx, id)
 	if err != nil {
 		// Don't fail the artist lookup if albums can't be fetched
-		// Just log and continue with empty albums
+		// Just log and continue with empty albums. CacheVersion stays zero so
+		// the next read retries instead of treating this as complete.
 		domainArtist.Albums = nil
 	} else {
 		domainArtist.Albums = transformReleaseGroupsToAlbums(releaseGroups.ReleaseGroups)
+		domainArtist.CacheVersion = artistCacheVersion
 	}
 
 	if repo != nil {
