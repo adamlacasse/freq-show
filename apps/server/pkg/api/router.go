@@ -67,7 +67,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	register("/albums/", albumLookupHandler(cfg.Albums, cfg.Embeddings, cfg.Embedder, cfg.MusicBrainz, cfg.Reviews))
 	register("/search", searchHandler(cfg.MusicBrainz))
 	register("/discover", discoverRateLimit(newDiscoverLimiter(), discoverHandler(cfg.Discovery)))
-	register("/collections/", collectionHandler(cfg.Collections))
+	register("/collections/", collectionHandler(cfg))
 
 	return corsMiddleware(mux)
 }
@@ -129,7 +129,7 @@ func albumLookupHandler(repo db.AlbumRepository, embeddingsRepo db.EmbeddingRepo
 	})
 }
 
-func collectionHandler(repo db.CollectionRepository) http.Handler {
+func collectionHandler(cfg RouterConfig) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/collections/")
 		if path == "" || path == r.URL.Path {
@@ -141,7 +141,7 @@ func collectionHandler(repo db.CollectionRepository) http.Handler {
 		userID := parts[0]
 
 		if len(parts) == 1 && r.Method == http.MethodGet {
-			items, err := repo.GetUserCollection(r.Context(), userID)
+			items, err := cfg.Collections.GetUserCollection(r.Context(), userID)
 			if err != nil {
 				writeJSON(w, http.StatusInternalServerError, errorResponse{"failed to fetch collection"})
 				return
@@ -161,7 +161,11 @@ func collectionHandler(repo db.CollectionRepository) http.Handler {
 				}
 				_ = json.NewDecoder(r.Body).Decode(&req)
 				
-				err := repo.AddAlbumToCollection(r.Context(), userID, albumID, req.Format)
+				// Ensure the album exists in the local database before adding to the collection.
+				// This guarantees the UI will have the title, artist, and year when displaying the collection.
+				_, _ = getOrFetchAlbum(r.Context(), cfg.Albums, cfg.Embeddings, cfg.Embedder, cfg.MusicBrainz, cfg.Reviews, albumID)
+
+				err := cfg.Collections.AddAlbumToCollection(r.Context(), userID, albumID, req.Format)
 				if err != nil {
 					writeJSON(w, http.StatusInternalServerError, errorResponse{"failed to add to collection"})
 					return
@@ -179,7 +183,10 @@ func collectionHandler(repo db.CollectionRepository) http.Handler {
 				}
 				_ = json.NewDecoder(r.Body).Decode(&req)
 				
-				err := repo.UpdateCollectionItem(r.Context(), userID, albumID, req.Format, req.CustomArtistName, req.CustomTitle, req.CustomYear)
+				// Optional: ensure album exists on edit as well just in case
+				_, _ = getOrFetchAlbum(r.Context(), cfg.Albums, cfg.Embeddings, cfg.Embedder, cfg.MusicBrainz, cfg.Reviews, albumID)
+
+				err := cfg.Collections.UpdateCollectionItem(r.Context(), userID, albumID, req.Format, req.CustomArtistName, req.CustomTitle, req.CustomYear)
 				if err != nil {
 					writeJSON(w, http.StatusInternalServerError, errorResponse{"failed to update collection item"})
 					return
@@ -189,7 +196,7 @@ func collectionHandler(repo db.CollectionRepository) http.Handler {
 			}
 			
 			if r.Method == http.MethodDelete {
-				err := repo.RemoveAlbumFromCollection(r.Context(), userID, albumID)
+				err := cfg.Collections.RemoveAlbumFromCollection(r.Context(), userID, albumID)
 				if err != nil {
 					writeJSON(w, http.StatusInternalServerError, errorResponse{"failed to remove from collection"})
 					return

@@ -52,11 +52,21 @@ export function app(): express.Express {
     })
   );
 
-  // Serve static files from /browser
+  // Serve static files from /browser.
+  //
+  // fallthrough:false is load-bearing. Without it, a request for a bundle that
+  // isn't on disk falls through to the Angular catch-all below and gets back a
+  // 200 with `text/html`. Browsers enforce strict MIME checking on module
+  // scripts, so `<script type="module" src="main-<hash>.js">` is rejected, the
+  // client never bootstraps, and the page still *looks* fine because SSR
+  // already painted it — a silent, total loss of interactivity with nothing in
+  // the server logs. Worse, that 200 is cacheable, so a CDN will happily pin
+  // HTML under a .js URL for the full max-age below. Fail loudly instead.
   server.get(
     '*.*',
     express.static(browserDistFolder, {
       maxAge: '1y',
+      fallthrough: false,
     })
   );
 
@@ -72,9 +82,38 @@ export function app(): express.Express {
         publicPath: browserDistFolder,
         providers: [{ provide: APP_BASE_HREF, useValue: baseUrl }],
       })
-      .then((html) => res.send(html))
+      .then((html) => {
+        // Server-rendered HTML references hashed bundles that change on every
+        // deploy, so it must never be cached at the edge. A stale cached
+        // document points at bundles that no longer exist on the origin.
+        res.set('Cache-Control', 'no-store');
+        res.send(html);
+      })
       .catch((err) => next(err));
   });
+
+  // Keep asset 404s as plain 404s rather than letting Express's default handler
+  // render an HTML error page (which can leak a stack trace when NODE_ENV isn't
+  // set to production, as is easy to miss on Render).
+  server.use(
+    (
+      err: any,
+      _req: express.Request,
+      res: express.Response,
+      next: express.NextFunction
+    ) => {
+      if (res.headersSent) {
+        return next(err);
+      }
+      const status = err?.status ?? err?.statusCode ?? 500;
+      if (status === 404) {
+        res.status(404).type('text/plain').send('Not Found');
+        return;
+      }
+      console.error('[SSR Error]', err);
+      res.status(500).type('text/plain').send('Internal Server Error');
+    }
+  );
 
   return server;
 }
