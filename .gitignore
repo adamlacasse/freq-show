@@ -1,3 +1,10 @@
 .DS_Store
 .env
 node_modules
+
+# SQLite. Production data lives on the Render disk; local dev DBs are throwaway
+# and should never be committed. The -wal/-shm files are SQLite's write-ahead
+# log sidecars and appear whenever the server is running.
+*.db
+*.db-wal
+*.db-shm
