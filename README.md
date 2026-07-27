@@ -113,7 +113,7 @@ For backend-only development, you can configure environment variables (optional)
 - `PORT` or `HTTP_PORT` (default `8080`)  
 - `SHUTDOWN_TIMEOUT_SECONDS` (default `10`)
 - `DATABASE_DRIVER` (`memory` or `sqlite`, default `sqlite`)
-- `DATABASE_URL` (default `file:freqshow.db?_fk=1` when using SQLite)
+- `DATABASE_URL` (**required** when using SQLite — no default; e.g. `file:freqshow.db?_pragma=foreign_keys(1)` locally, `file:/var/data/freqshow.db?_pragma=foreign_keys(1)` on Render)
 
 **MusicBrainz API:**
 

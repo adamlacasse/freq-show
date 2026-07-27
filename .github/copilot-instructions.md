@@ -46,7 +46,7 @@ All `/artists/{mbid}` and `/albums/{mbid}` endpoints follow this pattern:
 ### Environment-Driven Configuration
 Configuration in `apps/server/pkg/config/config.go` uses environment variables with sensible defaults:
 - `DATABASE_DRIVER=sqlite` (or `memory` for testing)
-- `DATABASE_URL=file:freqshow.db?_fk=1`
+- `DATABASE_URL=file:freqshow.db?_pragma=foreign_keys(1)` (required when `DATABASE_DRIVER=sqlite`; no default)
 - `MUSICBRAINZ_TIMEOUT_SECONDS=6`
 - `REVIEWS_DISCOGS_CONSUMER_KEY` and `REVIEWS_DISCOGS_CONSUMER_SECRET` for OAuth
 

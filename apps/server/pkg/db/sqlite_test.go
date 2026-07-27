@@ -11,7 +11,9 @@ import (
 const (
 	sqliteTestID      = "sqlite-test"
 	sqliteDBName      = "freqshow.db"
-	sqliteQuerySuffix = "?_fk=1"
+	// Mirrors the DSN shape used in .env / Render. modernc.org/sqlite expects
+	// _pragma=foreign_keys(1); it silently ignores _fk=1 (mattn/go-sqlite3 syntax).
+	sqliteQuerySuffix = "?_pragma=foreign_keys(1)"
 	sqliteNewErrFmt   = "NewSQLiteStore returned error: %v"
 	sqliteCloseErrFmt = "Close returned error: %v"
 	sqliteAlbumID     = "album-1"

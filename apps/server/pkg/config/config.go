@@ -13,7 +13,6 @@ const (
 	defaultEnv                       = "development"
 	defaultShutdownSeconds           = 10
 	defaultDatabaseDriver            = "sqlite"
-	defaultDatabaseURL               = "file:freqshow.db?_fk=1"
 	defaultMusicBrainzBase           = "https://musicbrainz.org/ws/2"
 	defaultMusicBrainzApp            = "freq-show"
 	defaultMusicBrainzVer            = "1.0"
@@ -27,6 +26,14 @@ const (
 	defaultReviewsTimeoutSeconds     = 10
 	defaultDiscoveryEmbeddingsProv   = "voyage"
 	defaultDiscoveryLLMProv          = "huggingface"
+
+	// exampleDatabaseURL appears in the startup error when DATABASE_URL is
+	// missing. There is deliberately no default for it: a relative path
+	// silently creates an empty database in whatever directory the process
+	// happens to start from, and migrate() then runs CREATE TABLE IF NOT
+	// EXISTS against it, so the server looks perfectly healthy while serving
+	// no data.
+	exampleDatabaseURL = "file:/var/data/freqshow.db?_pragma=foreign_keys(1)"
 
 	shutdownTimeoutEnv              = "SHUTDOWN_TIMEOUT_SECONDS"
 	portEnv                         = "PORT"
@@ -254,9 +261,12 @@ func resolveDatabase() (DatabaseConfig, error) {
 
 	switch driver {
 	case "sqlite":
-		url := strings.TrimSpace(envOrDefault(databaseURLEnv, defaultDatabaseURL))
-		if url == "" {
-			return DatabaseConfig{}, fmt.Errorf("database url required for sqlite driver")
+		url, ok := lookupNonEmpty(databaseURLEnv)
+		if !ok {
+			return DatabaseConfig{}, fmt.Errorf(
+				"%s is required when %s=sqlite (for example %s). Refusing to fall back to a relative path, which would create an empty database wherever the process starts",
+				databaseURLEnv, databaseDriverEnv, exampleDatabaseURL,
+			)
 		}
 		return DatabaseConfig{Driver: driver, URL: url}, nil
 	case "memory":
