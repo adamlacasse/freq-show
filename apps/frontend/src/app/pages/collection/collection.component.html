@@ -1,0 +1,79 @@
+<section class="border-b border-white/5 bg-freq-midnight/40">
+  <div class="mx-auto max-w-6xl px-6 py-12">
+    <div class="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+      <div class="max-w-2xl">
+        <p class="text-xs uppercase tracking-[0.3em] text-freq-teal/80">My Records</p>
+        <h1 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl">Collection</h1>
+        <p class="mt-4 text-base leading-relaxed text-freq-cream/75">
+          Everything you own, all in one place.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="mx-auto max-w-6xl px-6 py-10">
+  <!-- Search / Filter -->
+  <div class="mb-8 relative">
+    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+      <svg class="h-5 w-5 text-freq-cream/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+      </svg>
+    </div>
+    <input 
+      type="text" 
+      [(ngModel)]="searchTerm" 
+      (ngModelChange)="filterCollection()"
+      placeholder="Filter by artist or album title..." 
+      class="w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-10 pr-4 py-3 text-white placeholder:text-freq-cream/40 focus:border-freq-teal/70 focus:outline-none focus:ring-1 focus:ring-freq-teal/70 transition"
+    >
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="flex min-h-64 items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03]">
+    <div class="text-center">
+      <div class="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-freq-teal border-t-transparent"></div>
+      <p class="mt-4 text-sm text-freq-cream/70">Loading collection...</p>
+    </div>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !isLoading" class="rounded-2xl border border-freq-rose/30 bg-freq-rose/10 px-6 py-4 text-freq-rose">
+    <p>{{ error }}</p>
+    <button (click)="loadCollection()" class="mt-3 text-sm font-semibold hover:underline">Try again</button>
+  </div>
+
+  <!-- Collection Grid -->
+  <div *ngIf="!isLoading && !error">
+    <div *ngIf="filteredCollection.length > 0" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div *ngFor="let item of filteredCollection; trackBy: trackById" class="flex flex-col rounded-3xl border border-white/10 bg-white/[0.04] p-5 transition hover:border-white/20 hover:bg-white/[0.07]">
+        <a [routerLink]="['/albums', item.albumId]" class="block relative group aspect-square mb-4 rounded-xl overflow-hidden bg-white/5 border border-white/10">
+          <img *ngIf="item.album?.coverUrl" [src]="item.album?.coverUrl" alt="Cover" class="w-full h-full object-cover transition duration-300 group-hover:scale-105" loading="lazy">
+          <div *ngIf="!item.album?.coverUrl" class="absolute inset-0 flex items-center justify-center text-freq-cream/30">
+            <svg class="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
+          </div>
+        </a>
+        <div class="flex-1">
+          <a [routerLink]="['/albums', item.albumId]" class="text-lg font-semibold text-white hover:text-freq-teal transition line-clamp-1" [title]="item.album?.title">{{ item.album?.title || 'Unknown Album' }}</a>
+          <p class="mt-1 text-sm text-freq-cream/70 line-clamp-1" [title]="item.album?.artistName">{{ item.album?.artistName || 'Unknown Artist' }}</p>
+        </div>
+        <div class="mt-4 flex items-center justify-between border-t border-white/10 pt-4">
+          <span class="rounded-full bg-freq-teal/15 px-3 py-1 text-xs font-semibold text-freq-teal uppercase tracking-wide">{{ item.format }}</span>
+          <span class="text-xs text-freq-cream/40" [title]="'Added ' + item.addedAt">{{ item.addedAt | date:'MMM yyyy' }}</span>
+        </div>
+      </div>
+    </div>
+    
+    <div *ngIf="filteredCollection.length === 0" class="flex min-h-64 items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-center text-freq-cream/60">
+      <div *ngIf="collection.length === 0">
+        <p class="text-lg font-medium text-white mb-2">Your collection is empty.</p>
+        <p>Go to an album page and click "Add to Collection" to start tracking your records.</p>
+        <a routerLink="/" class="mt-4 inline-block rounded-full bg-freq-teal px-6 py-2 text-sm font-semibold text-freq-ink transition hover:bg-freq-teal/90">Search for records</a>
+      </div>
+      <div *ngIf="collection.length > 0">
+        <p>No records found matching "{{ searchTerm }}".</p>
+        <button (click)="searchTerm = ''; filterCollection()" class="mt-2 text-freq-teal hover:underline">Clear filter</button>
+      </div>
+    </div>
+  </div>
+</section>

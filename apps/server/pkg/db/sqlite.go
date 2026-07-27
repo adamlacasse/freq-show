@@ -237,6 +237,20 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, createEmbeddingsModelIdx); err != nil {
 		return fmt.Errorf("db: migrate album_embeddings index: %w", err)
 	}
+
+	const createCollectionItems = `CREATE TABLE IF NOT EXISTS collection_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        album_id TEXT NOT NULL,
+        format TEXT,
+        added_at TIMESTAMP NOT NULL,
+        UNIQUE(user_id, album_id)
+    )`
+
+	if _, err := s.db.ExecContext(ctx, createCollectionItems); err != nil {
+		return fmt.Errorf("db: migrate collection_items: %w", err)
+	}
+
 	return nil
 }
 
@@ -362,4 +376,78 @@ func decodeVector(b []byte) ([]float32, error) {
 		v[i] = math.Float32frombits(binary.LittleEndian.Uint32(b[i*4:]))
 	}
 	return v, nil
+}
+
+// AddAlbumToCollection adds an album to a user's collection.
+func (s *SQLiteStore) AddAlbumToCollection(ctx context.Context, userID, albumID, format string) error {
+	if strings.TrimSpace(userID) == "" || strings.TrimSpace(albumID) == "" {
+		return errors.New("db: user id and album id required")
+	}
+
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO collection_items (user_id, album_id, format, added_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(user_id, album_id) DO UPDATE SET format = excluded.format, added_at = excluded.added_at`,
+		userID, albumID, format, time.Now().UTC(),
+	)
+	if err != nil {
+		return fmt.Errorf("db: add to collection: %w", err)
+	}
+	return nil
+}
+
+// RemoveAlbumFromCollection removes an album from a user's collection.
+func (s *SQLiteStore) RemoveAlbumFromCollection(ctx context.Context, userID, albumID string) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		`DELETE FROM collection_items WHERE user_id = ? AND album_id = ?`,
+		userID, albumID,
+	)
+	if err != nil {
+		return fmt.Errorf("db: remove from collection: %w", err)
+	}
+	return nil
+}
+
+// GetUserCollection retrieves the user's collection.
+func (s *SQLiteStore) GetUserCollection(ctx context.Context, userID string) ([]data.CollectionItem, error) {
+	query := `SELECT c.id, c.user_id, c.album_id, c.format, c.added_at, a.payload
+	          FROM collection_items c
+			  LEFT JOIN albums a ON c.album_id = a.id
+			  WHERE c.user_id = ?
+			  ORDER BY c.added_at DESC`
+	
+	rows, err := s.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("db: query collection: %w", err)
+	}
+	defer rows.Close()
+
+	var items []data.CollectionItem
+	for rows.Next() {
+		var item data.CollectionItem
+		var addedAt time.Time
+		var albumPayload sql.NullString
+		
+		if err := rows.Scan(&item.ID, &item.UserID, &item.AlbumID, &item.Format, &addedAt, &albumPayload); err != nil {
+			return nil, fmt.Errorf("db: scan collection item: %w", err)
+		}
+		item.AddedAt = addedAt.Format(time.RFC3339)
+
+		if albumPayload.Valid && albumPayload.String != "" {
+			var album data.Album
+			if err := json.Unmarshal([]byte(albumPayload.String), &album); err == nil {
+				item.Album = &album
+			}
+		}
+
+		items = append(items, item)
+	}
+	
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("db: iterate collection: %w", err)
+	}
+
+	return items, nil
 }

@@ -22,6 +22,13 @@ type AlbumRepository interface {
 	ListAlbumsMissingEmbedding(ctx context.Context, model string, limit int) ([]data.Album, error)
 }
 
+// CollectionRepository defines persistence operations for user collections.
+type CollectionRepository interface {
+	AddAlbumToCollection(ctx context.Context, userID, albumID, format string) error
+	RemoveAlbumFromCollection(ctx context.Context, userID, albumID string) error
+	GetUserCollection(ctx context.Context, userID string) ([]data.CollectionItem, error)
+}
+
 // EmbeddingRepository defines persistence operations for album embedding vectors.
 // The `(mbid, model)` composite key lets multiple model versions coexist in
 // the table during a rolling reindex.
@@ -44,6 +51,7 @@ type Store interface {
 	ArtistRepository
 	AlbumRepository
 	EmbeddingRepository
+	CollectionRepository
 	Close(ctx context.Context) error
 }
 
@@ -282,4 +290,19 @@ func (s *MemoryStore) DeleteOtherModels(ctx context.Context, keepModel string) (
 		delete(s.embeddings, model)
 	}
 	return deleted, nil
+}
+
+// AddAlbumToCollection adds an album to a user's collection (MemoryStore dummy implementation).
+func (s *MemoryStore) AddAlbumToCollection(ctx context.Context, userID, albumID, format string) error {
+	return nil
+}
+
+// RemoveAlbumFromCollection removes an album from a user's collection (MemoryStore dummy implementation).
+func (s *MemoryStore) RemoveAlbumFromCollection(ctx context.Context, userID, albumID string) error {
+	return nil
+}
+
+// GetUserCollection retrieves the user's collection (MemoryStore dummy implementation).
+func (s *MemoryStore) GetUserCollection(ctx context.Context, userID string) ([]data.CollectionItem, error) {
+	return nil, nil
 }

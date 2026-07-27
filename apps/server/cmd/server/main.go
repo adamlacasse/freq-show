@@ -115,6 +115,7 @@ func main() {
 		Artists:     store,
 		Albums:      store,
 		Embeddings:  store,
+		Collections: store,
 		Embedder:    discoveryEmbedder,
 		Discovery:   discoveryService,
 	})

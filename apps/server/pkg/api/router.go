@@ -46,6 +46,7 @@ type RouterConfig struct {
 	Embeddings  db.EmbeddingRepository
 	Embedder    embeddings.Embedder
 	Discovery   *discovery.Service
+	Collections db.CollectionRepository
 }
 
 // NewRouter wires the top-level HTTP routes for the backend.
@@ -56,6 +57,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	mux.Handle("/albums/", albumLookupHandler(cfg.Albums, cfg.Embeddings, cfg.Embedder, cfg.MusicBrainz, cfg.Reviews))
 	mux.HandleFunc("/search", searchHandler(cfg.MusicBrainz))
 	mux.Handle("/discover", discoverRateLimit(newDiscoverLimiter(), discoverHandler(cfg.Discovery)))
+	mux.Handle("/collections/", collectionHandler(cfg.Collections))
 	return corsMiddleware(mux)
 }
 
@@ -113,6 +115,62 @@ func albumLookupHandler(repo db.AlbumRepository, embeddingsRepo db.EmbeddingRepo
 		}
 
 		writeJSON(w, http.StatusOK, normalizeAlbumForJSON(album))
+	})
+}
+
+func collectionHandler(repo db.CollectionRepository) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/collections/")
+		if path == "" || path == r.URL.Path {
+			writeJSON(w, http.StatusBadRequest, errorResponse{"user id required"})
+			return
+		}
+
+		parts := strings.Split(path, "/")
+		userID := parts[0]
+
+		if len(parts) == 1 && r.Method == http.MethodGet {
+			items, err := repo.GetUserCollection(r.Context(), userID)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, errorResponse{"failed to fetch collection"})
+				return
+			}
+			if items == nil {
+				items = []data.CollectionItem{}
+			}
+			writeJSON(w, http.StatusOK, items)
+			return
+		}
+
+		if len(parts) == 3 && parts[1] == "albums" {
+			albumID := parts[2]
+			if r.Method == http.MethodPost {
+				var req struct {
+					Format string `json:"format"`
+				}
+				_ = json.NewDecoder(r.Body).Decode(&req)
+				
+				err := repo.AddAlbumToCollection(r.Context(), userID, albumID, req.Format)
+				if err != nil {
+					writeJSON(w, http.StatusInternalServerError, errorResponse{"failed to add to collection"})
+					return
+				}
+				writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+				return
+			}
+			
+			if r.Method == http.MethodDelete {
+				err := repo.RemoveAlbumFromCollection(r.Context(), userID, albumID)
+				if err != nil {
+					writeJSON(w, http.StatusInternalServerError, errorResponse{"failed to remove from collection"})
+					return
+				}
+				writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+				return
+			}
+		}
+
+		w.WriteHeader(http.StatusMethodNotAllowed)
 	})
 }
 

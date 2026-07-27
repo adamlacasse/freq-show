@@ -58,3 +58,12 @@ type Review struct {
 	Text    string  `json:"text"`
 	URL     string  `json:"url"`
 }
+
+type CollectionItem struct {
+	ID       int       `json:"id"`
+	UserID   string    `json:"userId"`
+	AlbumID  string    `json:"albumId"`
+	Format   string    `json:"format"`
+	AddedAt  string    `json:"addedAt"`
+	Album    *Album    `json:"album,omitempty"`
+}

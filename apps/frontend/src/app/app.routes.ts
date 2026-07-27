@@ -3,10 +3,12 @@ import { HomeComponent } from './pages/home/home.component';
 import { ArtistDetailComponent } from './pages/artist-detail/artist-detail.component';
 import { AlbumDetailComponent } from './pages/album-detail/album-detail.component';
 import { DiscoverComponent } from './pages/discover/discover.component';
+import { CollectionComponent } from './pages/collection/collection.component';
 
 export const routes: Routes = [
 	{ path: '', component: HomeComponent },
 	{ path: 'discover', component: DiscoverComponent },
+	{ path: 'collections/:userId', component: CollectionComponent },
 	{ path: 'artists/:id', component: ArtistDetailComponent },
 	{ path: 'albums/:id', component: AlbumDetailComponent },
 	{ path: '**', redirectTo: '' },

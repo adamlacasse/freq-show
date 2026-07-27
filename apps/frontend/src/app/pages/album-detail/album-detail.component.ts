@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, Subscription, takeUntil } from 'rxjs';
 import { AlbumService } from '../../services/album.service';
+import { CollectionService } from '../../services/collection.service';
 import { NavigationContextService, AlbumProvenance } from '../../services/navigation-context.service';
 import type { components } from '../../models/openapi-types.generated';
 
@@ -20,6 +21,9 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
   error: string | null = null;
   provenance: AlbumProvenance | null = null;
   backLabel = 'Back to Search';
+  isInCollection = false;
+  isCollectionLoading = false;
+  userId = 'adam'; // Hardcoded for MVP
   private albumId: string | null = null;
   private activeLoad?: Subscription;
   private destroy$ = new Subject<void>();
@@ -28,6 +32,7 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private albumService: AlbumService,
+    private collectionService: CollectionService,
     private navigationContextService: NavigationContextService
   ) {}
 
@@ -107,6 +112,7 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
         next: (album: Album) => {
           this.album = album;
           this.isLoading = false;
+          this.checkCollectionStatus(albumId);
         },
         error: (error: unknown) => {
           console.error('Error loading album:', error);
@@ -115,6 +121,46 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
           this.isLoading = false;
         }
       });
+  }
+
+  private checkCollectionStatus(albumId: string): void {
+    this.isCollectionLoading = true;
+    this.collectionService.getCollection(this.userId).subscribe({
+      next: (collection) => {
+        this.isInCollection = collection.some(item => item.albumId === albumId);
+        this.isCollectionLoading = false;
+      },
+      error: () => {
+        this.isCollectionLoading = false;
+      }
+    });
+  }
+
+  toggleCollection(): void {
+    if (!this.albumId) return;
+    this.isCollectionLoading = true;
+
+    if (this.isInCollection) {
+      this.collectionService.removeAlbumFromCollection(this.userId, this.albumId).subscribe({
+        next: () => {
+          this.isInCollection = false;
+          this.isCollectionLoading = false;
+        },
+        error: () => {
+          this.isCollectionLoading = false;
+        }
+      });
+    } else {
+      this.collectionService.addAlbumToCollection(this.userId, this.albumId).subscribe({
+        next: () => {
+          this.isInCollection = true;
+          this.isCollectionLoading = false;
+        },
+        error: () => {
+          this.isCollectionLoading = false;
+        }
+      });
+    }
   }
 
   getReleaseYear(): string {
