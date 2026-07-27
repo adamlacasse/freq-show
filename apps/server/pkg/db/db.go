@@ -25,6 +25,7 @@ type AlbumRepository interface {
 // CollectionRepository defines persistence operations for user collections.
 type CollectionRepository interface {
 	AddAlbumToCollection(ctx context.Context, userID, albumID, format string) error
+	UpdateCollectionItem(ctx context.Context, userID, albumID, format, customArtistName string) error
 	RemoveAlbumFromCollection(ctx context.Context, userID, albumID string) error
 	GetUserCollection(ctx context.Context, userID string) ([]data.CollectionItem, error)
 }
@@ -294,6 +295,11 @@ func (s *MemoryStore) DeleteOtherModels(ctx context.Context, keepModel string) (
 
 // AddAlbumToCollection adds an album to a user's collection (MemoryStore dummy implementation).
 func (s *MemoryStore) AddAlbumToCollection(ctx context.Context, userID, albumID, format string) error {
+	return nil
+}
+
+// UpdateCollectionItem updates a collection item (MemoryStore dummy implementation).
+func (s *MemoryStore) UpdateCollectionItem(ctx context.Context, userID, albumID, format, customArtistName string) error {
 	return nil
 }
 

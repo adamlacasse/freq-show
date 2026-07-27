@@ -243,6 +243,7 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
         user_id TEXT NOT NULL,
         album_id TEXT NOT NULL,
         format TEXT,
+        custom_artist_name TEXT,
         added_at TIMESTAMP NOT NULL,
         UNIQUE(user_id, album_id)
     )`
@@ -250,6 +251,9 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, createCollectionItems); err != nil {
 		return fmt.Errorf("db: migrate collection_items: %w", err)
 	}
+
+	// Gracefully ensure column exists for pre-existing tables
+	_, _ = s.db.ExecContext(ctx, `ALTER TABLE collection_items ADD COLUMN custom_artist_name TEXT`)
 
 	return nil
 }
@@ -397,6 +401,23 @@ func (s *SQLiteStore) AddAlbumToCollection(ctx context.Context, userID, albumID,
 	return nil
 }
 
+// UpdateCollectionItem updates format and custom_artist_name for a collection item.
+func (s *SQLiteStore) UpdateCollectionItem(ctx context.Context, userID, albumID, format, customArtistName string) error {
+	if strings.TrimSpace(userID) == "" || strings.TrimSpace(albumID) == "" {
+		return errors.New("db: user id and album id required")
+	}
+
+	_, err := s.db.ExecContext(
+		ctx,
+		`UPDATE collection_items SET format = ?, custom_artist_name = ? WHERE user_id = ? AND album_id = ?`,
+		format, customArtistName, userID, albumID,
+	)
+	if err != nil {
+		return fmt.Errorf("db: update collection item: %w", err)
+	}
+	return nil
+}
+
 // RemoveAlbumFromCollection removes an album from a user's collection.
 func (s *SQLiteStore) RemoveAlbumFromCollection(ctx context.Context, userID, albumID string) error {
 	_, err := s.db.ExecContext(
@@ -412,7 +433,7 @@ func (s *SQLiteStore) RemoveAlbumFromCollection(ctx context.Context, userID, alb
 
 // GetUserCollection retrieves the user's collection.
 func (s *SQLiteStore) GetUserCollection(ctx context.Context, userID string) ([]data.CollectionItem, error) {
-	query := `SELECT c.id, c.user_id, c.album_id, c.format, c.added_at, a.payload
+	query := `SELECT c.id, c.user_id, c.album_id, c.format, c.custom_artist_name, c.added_at, a.payload
 	          FROM collection_items c
 			  LEFT JOIN albums a ON c.album_id = a.id
 			  WHERE c.user_id = ?
@@ -428,12 +449,16 @@ func (s *SQLiteStore) GetUserCollection(ctx context.Context, userID string) ([]d
 	for rows.Next() {
 		var item data.CollectionItem
 		var addedAt time.Time
+		var customArtistName sql.NullString
 		var albumPayload sql.NullString
 		
-		if err := rows.Scan(&item.ID, &item.UserID, &item.AlbumID, &item.Format, &addedAt, &albumPayload); err != nil {
+		if err := rows.Scan(&item.ID, &item.UserID, &item.AlbumID, &item.Format, &customArtistName, &addedAt, &albumPayload); err != nil {
 			return nil, fmt.Errorf("db: scan collection item: %w", err)
 		}
 		item.AddedAt = addedAt.Format(time.RFC3339)
+		if customArtistName.Valid {
+			item.CustomArtistName = customArtistName.String
+		}
 
 		if albumPayload.Valid && albumPayload.String != "" {
 			var album data.Album

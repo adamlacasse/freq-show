@@ -55,7 +55,31 @@
         </a>
         <div class="flex-1">
           <a [routerLink]="['/albums', item.albumId]" class="text-lg font-semibold text-white hover:text-freq-teal transition line-clamp-1" [title]="item.album?.title">{{ item.album?.title || 'Unknown Album' }}</a>
-          <p class="mt-1 text-sm text-freq-cream/70 line-clamp-1" [title]="item.album?.artistName">{{ item.album?.artistName || 'Unknown Artist' }}</p>
+          
+          <!-- Normal View -->
+          <div *ngIf="editingItemId !== item.id" class="group/artist mt-1 flex items-center justify-between gap-1">
+            <p class="text-sm text-freq-cream/70 line-clamp-1" [title]="item.customArtistName || item.album?.artistName">
+              {{ item.customArtistName || item.album?.artistName || 'Unknown Artist' }}
+              <span *ngIf="item.customArtistName" class="ml-1 text-[10px] text-freq-teal/70" title="Custom artist name override">(custom)</span>
+            </p>
+            <button (click)="startEditing(item, $event)" title="Edit artist name" class="opacity-60 sm:opacity-0 sm:group-hover/artist:opacity-100 p-1.5 text-freq-cream/60 hover:text-freq-teal transition">
+              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+            </button>
+          </div>
+
+          <!-- Edit Mode -->
+          <form *ngIf="editingItemId === item.id" (ngSubmit)="saveCustomArtist(item, $event)" class="mt-2 flex items-center gap-1.5" (click)="$event.stopPropagation()">
+            <input 
+              type="text" 
+              [(ngModel)]="editArtistName" 
+              name="editArtist"
+              placeholder="Artist name..."
+              class="w-full rounded-lg border border-freq-teal/50 bg-black/40 px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-freq-teal"
+              autoFocus
+            >
+            <button type="submit" title="Save" class="rounded-lg bg-freq-teal/20 px-2 py-1 text-xs font-semibold text-freq-teal hover:bg-freq-teal/30">✓</button>
+            <button type="button" (click)="cancelEditing($event)" title="Cancel" class="rounded-lg bg-white/10 px-2 py-1 text-xs text-freq-cream/60 hover:bg-white/20">✕</button>
+          </form>
         </div>
         <div class="mt-4 flex items-center justify-between border-t border-white/10 pt-4">
           <span class="rounded-full bg-freq-teal/15 px-3 py-1 text-xs font-semibold text-freq-teal uppercase tracking-wide">{{ item.format }}</span>

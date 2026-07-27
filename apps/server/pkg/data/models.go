@@ -60,10 +60,11 @@ type Review struct {
 }
 
 type CollectionItem struct {
-	ID       int       `json:"id"`
-	UserID   string    `json:"userId"`
-	AlbumID  string    `json:"albumId"`
-	Format   string    `json:"format"`
-	AddedAt  string    `json:"addedAt"`
-	Album    *Album    `json:"album,omitempty"`
+	ID               int    `json:"id"`
+	UserID           string `json:"userId"`
+	AlbumID          string `json:"albumId"`
+	Format           string `json:"format"`
+	CustomArtistName string `json:"customArtistName,omitempty"`
+	AddedAt          string `json:"addedAt"`
+	Album            *Album `json:"album,omitempty"`
 }

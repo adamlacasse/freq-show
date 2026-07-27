@@ -159,6 +159,22 @@ func collectionHandler(repo db.CollectionRepository) http.Handler {
 				return
 			}
 			
+			if r.Method == http.MethodPut || r.Method == http.MethodPatch {
+				var req struct {
+					Format           string `json:"format"`
+					CustomArtistName string `json:"customArtistName"`
+				}
+				_ = json.NewDecoder(r.Body).Decode(&req)
+				
+				err := repo.UpdateCollectionItem(r.Context(), userID, albumID, req.Format, req.CustomArtistName)
+				if err != nil {
+					writeJSON(w, http.StatusInternalServerError, errorResponse{"failed to update collection item"})
+					return
+				}
+				writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+				return
+			}
+			
 			if r.Method == http.MethodDelete {
 				err := repo.RemoveAlbumFromCollection(r.Context(), userID, albumID)
 				if err != nil {

@@ -19,6 +19,9 @@ export class CollectionComponent implements OnInit {
   searchTerm = '';
   userId = 'adam'; // Hardcoded for MVP
 
+  editingItemId: number | null = null;
+  editArtistName = '';
+
   constructor(private collectionService: CollectionService) {}
 
   ngOnInit(): void {
@@ -51,8 +54,44 @@ export class CollectionComponent implements OnInit {
 
     this.filteredCollection = this.collection.filter(item => {
       const albumTitle = item.album?.title?.toLowerCase() || '';
-      const artistName = item.album?.artistName?.toLowerCase() || '';
+      const artistName = (item.customArtistName || item.album?.artistName || '').toLowerCase();
       return albumTitle.includes(term) || artistName.includes(term);
+    });
+  }
+
+  startEditing(item: CollectionItem, event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.editingItemId = item.id;
+    this.editArtistName = item.customArtistName || item.album?.artistName || '';
+  }
+
+  cancelEditing(event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    this.editingItemId = null;
+    this.editArtistName = '';
+  }
+
+  saveCustomArtist(item: CollectionItem, event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
+    const newName = this.editArtistName.trim();
+    // If user cleared custom name or set it equal to original, revert to undefined
+    const finalCustomName = (newName && newName !== item.album?.artistName) ? newName : '';
+
+    this.collectionService.updateCollectionItem(this.userId, item.albumId, item.format, finalCustomName).subscribe({
+      next: () => {
+        item.customArtistName = finalCustomName || undefined;
+        this.collection = this.sortCollection(this.collection);
+        this.filterCollection();
+        this.editingItemId = null;
+      },
+      error: (err) => {
+        console.error('Failed to update artist name:', err);
+      }
     });
   }
 
@@ -63,8 +102,8 @@ export class CollectionComponent implements OnInit {
       if (!a.album) return 1;
       if (!b.album) return -1;
 
-      const artistA = a.album.artistName || '';
-      const artistB = b.album.artistName || '';
+      const artistA = a.customArtistName || a.album.artistName || '';
+      const artistB = b.customArtistName || b.album.artistName || '';
 
       const keyA = this.getSmartArtistKey(artistA);
       const keyB = this.getSmartArtistKey(artistB);
