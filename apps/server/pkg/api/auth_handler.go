@@ -117,7 +117,8 @@ var verifyConfirmPage = template.Must(template.New("verify-confirm").Parse(`<!do
 <head><meta charset="utf-8"><title>Sign in to FreqShow</title></head>
 <body>
 <p>Click below to finish signing in to FreqShow.</p>
-<form method="POST" action="/auth/verify?token={{.}}">
+<form method="POST" action="">
+  <input type="hidden" name="token" value="{{.}}">
   <button type="submit">Complete sign-in</button>
 </form>
 </body>
@@ -138,18 +139,37 @@ func authVerifyHandler(svc AuthService, cfg cookieConfig) http.Handler {
 			return
 		}
 
-		token := strings.TrimSpace(r.URL.Query().Get("token"))
-		if token == "" {
-			writeJSON(w, http.StatusBadRequest, errorResponse{"token query parameter is required"})
-			return
-		}
-
 		switch r.Method {
 		case http.MethodGet:
+			token := strings.TrimSpace(r.URL.Query().Get("token"))
+			if token == "" {
+				writeJSON(w, http.StatusBadRequest, errorResponse{"token query parameter is required"})
+				return
+			}
+			// no-store: this page (and the token it carries) must never be
+			// served from a shared/browser cache to a different visitor.
+			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.WriteHeader(http.StatusOK)
 			_ = verifyConfirmPage.Execute(w, token)
 		case http.MethodPost:
+			// The confirm page's form posts back with action="" (this same
+			// URL, query string included — see verifyConfirmPage) plus the
+			// token as a hidden field, so read whichever is present rather
+			// than assuming one: a relative empty action is not honored
+			// identically everywhere, and either source is equally trusted.
+			if err := r.ParseForm(); err != nil {
+				writeJSON(w, http.StatusBadRequest, errorResponse{"invalid form submission"})
+				return
+			}
+			token := strings.TrimSpace(r.FormValue("token"))
+			if token == "" {
+				token = strings.TrimSpace(r.URL.Query().Get("token"))
+			}
+			if token == "" {
+				writeJSON(w, http.StatusBadRequest, errorResponse{"token is required"})
+				return
+			}
 			completeVerify(w, r, svc, cfg, token)
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -161,6 +181,10 @@ func authVerifyHandler(svc AuthService, cfg cookieConfig) http.Handler {
 // consuming the token and issuing a session. Split out from
 // authVerifyHandler so the GET path above can never reach it by accident.
 func completeVerify(w http.ResponseWriter, r *http.Request, svc AuthService, cfg cookieConfig, token string) {
+	// no-store applies to every response this handler can produce,
+	// success or failure alike — none of them should be cached.
+	w.Header().Set("Cache-Control", "no-store")
+
 	sessionToken, expiresAt, err := svc.VerifyToken(r.Context(), token)
 	if err != nil {
 		if errors.Is(err, auth.ErrTokenInvalid) {

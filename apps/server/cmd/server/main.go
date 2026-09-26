@@ -131,19 +131,18 @@ func main() {
 	}
 
 	router := api.NewRouter(api.RouterConfig{
-		MusicBrainz:        mbClient,
-		Wikipedia:          wikiClient,
-		Reviews:            reviewsClient,
-		Artists:            store,
-		Albums:             store,
-		Embeddings:         store,
-		Collections:        store,
-		Embedder:           discoveryEmbedder,
-		Discovery:          discoveryService,
-		Auth:               authService,
-		CookieSecure:       cfg.Env != "development",
-		AuthFrontendURL:    cfg.Auth.FrontendURL,
-		CORSAllowedOrigins: cfg.CORSAllowedOrigins,
+		MusicBrainz:     mbClient,
+		Wikipedia:       wikiClient,
+		Reviews:         reviewsClient,
+		Artists:         store,
+		Albums:          store,
+		Embeddings:      store,
+		Collections:     store,
+		Embedder:        discoveryEmbedder,
+		Discovery:       discoveryService,
+		Auth:            authService,
+		CookieSecure:    cfg.Env != "development",
+		AuthFrontendURL: cfg.Auth.FrontendURL,
 	})
 
 	srv := &http.Server{

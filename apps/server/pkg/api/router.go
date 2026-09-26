@@ -74,12 +74,6 @@ type RouterConfig struct {
 	// browser after a successful sign-in. Empty serves a minimal
 	// confirmation page instead.
 	AuthFrontendURL string
-
-	// CORSAllowedOrigins are the frontend origins allowed to receive
-	// Access-Control-Allow-Credentials: true (see corsMiddleware). Every
-	// other origin still gets CORS headers for the public,
-	// unauthenticated endpoints, just never with credentials.
-	CORSAllowedOrigins []string
 }
 
 // NewRouter wires the top-level HTTP routes for the backend.
@@ -104,14 +98,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	register("/auth/request", authRequestHandler(cfg.Auth, newAuthRequestLimiter()))
 	register("/auth/verify", authVerifyHandler(cfg.Auth, cookieConfig{secure: cfg.CookieSecure, frontendURL: cfg.AuthFrontendURL}))
 
-	allowedOrigins := make(map[string]struct{}, len(cfg.CORSAllowedOrigins))
-	for _, origin := range cfg.CORSAllowedOrigins {
-		if origin != "" {
-			allowedOrigins[origin] = struct{}{}
-		}
-	}
-
-	return corsMiddleware(allowedOrigins, mux)
+	return corsMiddleware(mux)
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -807,36 +794,21 @@ func parseSearchOffset(offsetStr string) int {
 }
 
 // corsMiddleware adds CORS headers for local development & production
-// deployments. allowedOrigins is the set of frontend origins permitted to
-// receive Access-Control-Allow-Credentials: true — every other origin is
-// still echoed back (preserving this API's original wide-open CORS policy
-// for its public, unauthenticated endpoints: search, artists, albums,
-// anonymous /discover) but never paired with credentials.
-//
-// Pairing credentials with an arbitrary reflected origin — the previous
-// behavior — lets any site an authenticated user visits issue a
-// credentialed cross-origin request and read the response (e.g. their
-// saved collection): the browser only withholds a credentialed response
-// from script when Access-Control-Allow-Credentials is absent, and a
-// wildcard "*" Allow-Origin is never valid alongside credentials at all.
-// Gating the credentials header behind an explicit allowlist is the fix;
-// the wide-open origin echo for non-credentialed requests is unaffected.
-func corsMiddleware(allowedOrigins map[string]struct{}, next http.Handler) http.Handler {
+// deployments. It does not set Access-Control-Allow-Credentials: both the
+// dev proxy (apps/frontend/proxy.conf.json) and prod (Render) proxy
+// /api/* same-origin, so the browser never makes a cross-origin call to
+// this API and the session cookie never needs to cross an origin either —
+// there is nothing here for that header to enable. Pairing it with an
+// arbitrary reflected Origin (as a prior version of this middleware did)
+// would instead let any site an authenticated user visits issue a
+// credentialed cross-origin request and read the response.
+func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		switch {
-		case origin == "":
-			// Non-browser request (no Origin header sent): nothing to
-			// restrict, and no credentials will be attached either way.
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-		case isAllowedOrigin(origin, allowedOrigins):
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Vary", "Origin")
-		default:
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Vary", "Origin")
+		if origin == "" {
+			origin = "*"
 		}
+		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.Header().Set("Access-Control-Max-Age", "86400")
@@ -849,9 +821,4 @@ func corsMiddleware(allowedOrigins map[string]struct{}, next http.Handler) http.
 
 		next.ServeHTTP(w, r)
 	})
-}
-
-func isAllowedOrigin(origin string, allowed map[string]struct{}) bool {
-	_, ok := allowed[origin]
-	return ok
 }

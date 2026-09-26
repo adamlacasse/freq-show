@@ -181,8 +181,11 @@ func TestAuthVerifyHandlerGETDoesNotConsumeToken(t *testing.T) {
 	if !strings.Contains(body, `method="POST"`) {
 		t.Fatalf("expected confirmation page with a POST form, got %q", body)
 	}
-	if !strings.Contains(body, "token=good-token") {
-		t.Fatalf("expected the form to carry the token through, got %q", body)
+	if !strings.Contains(body, `name="token" value="good-token"`) {
+		t.Fatalf("expected the form to carry the token through as a hidden field, got %q", body)
+	}
+	if strings.Contains(body, `action="/auth/verify`) {
+		t.Fatalf("expected a relative form action (not an absolute /auth/verify path, which bypasses the frontend's /api proxy), got %q", body)
 	}
 }
 

@@ -635,44 +635,44 @@ func (s *SQLiteStore) SaveLoginToken(ctx context.Context, tokenHash, email strin
 }
 
 // ConsumeLoginToken atomically marks a login token used and returns the
-// email it was issued for. It runs the read-check-update inside a
-// transaction so two concurrent verify requests for the same token cannot
-// both succeed.
+// email it was issued for. The UPDATE's own WHERE clause (consumed_at IS
+// NULL AND expires_at > ?) is the atomicity: a SELECT-then-UPDATE would
+// leave a window between the two statements where two near-simultaneous
+// callers (e.g. an email scanner prefetching the link and the real user
+// clicking it moments later) could both read "not yet consumed" and both
+// proceed to update, relying on SQLite's BUSY retry behavior rather than
+// the query itself to prevent a double-consume. A single conditional
+// UPDATE has no such window: only one caller's statement can be the one
+// that actually flips consumed_at, and RowsAffected tells us which.
 func (s *SQLiteStore) ConsumeLoginToken(ctx context.Context, tokenHash string, now time.Time) (string, bool, error) {
 	if strings.TrimSpace(tokenHash) == "" {
 		return "", false, nil
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
+	res, err := s.db.ExecContext(
+		ctx,
+		`UPDATE login_tokens SET consumed_at = ? WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ?`,
+		now.UTC(), tokenHash, now.UTC(),
+	)
 	if err != nil {
-		return "", false, fmt.Errorf("db: begin consume login token: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	row := tx.QueryRowContext(ctx, `SELECT email, expires_at, consumed_at FROM login_tokens WHERE token_hash = ?`, tokenHash)
-
-	var email string
-	var expiresAt time.Time
-	var consumedAt sql.NullTime
-	if err := row.Scan(&email, &expiresAt, &consumedAt); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", false, nil
-		}
-		return "", false, fmt.Errorf("db: query login token: %w", err)
-	}
-
-	if consumedAt.Valid || now.After(expiresAt) {
-		return "", false, nil
-	}
-
-	if _, err := tx.ExecContext(ctx, `UPDATE login_tokens SET consumed_at = ? WHERE token_hash = ?`, now.UTC(), tokenHash); err != nil {
 		return "", false, fmt.Errorf("db: consume login token: %w", err)
 	}
 
-	if err := tx.Commit(); err != nil {
-		return "", false, fmt.Errorf("db: commit consume login token: %w", err)
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return "", false, fmt.Errorf("db: consume login token rows affected: %w", err)
+	}
+	if affected != 1 {
+		// Either the token doesn't exist, or it was already consumed/expired
+		// (including by a concurrent caller that won the race above).
+		return "", false, nil
 	}
 
+	row := s.db.QueryRowContext(ctx, `SELECT email FROM login_tokens WHERE token_hash = ?`, tokenHash)
+	var email string
+	if err := row.Scan(&email); err != nil {
+		return "", false, fmt.Errorf("db: query consumed login token email: %w", err)
+	}
 	return email, true, nil
 }
 

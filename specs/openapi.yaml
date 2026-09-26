@@ -192,13 +192,18 @@ paths:
   /auth/verify:
     get:
       tags: [Auth]
-      summary: Verify a magic-link token and start a session
+      summary: Render a non-destructive sign-in confirmation page
       description: |
-        Exchanges a one-time magic-link token (from the emailed link) for a
-        session, delivered as an HttpOnly `freqshow_session` cookie. Either
-        redirects to the configured frontend URL or serves a minimal
-        confirmation page.
-      operationId: verifyLogin
+        Renders an HTML page with a form that POSTs back to this same
+        endpoint. Deliberately does not consume the token itself: email
+        security scanners and prefetchers (e.g. Microsoft Defender
+        SafeLinks, Proofpoint) automatically fetch links found in incoming
+        mail before the recipient opens the message, and a GET that
+        consumed the one-time token would let that automated fetch burn it
+        before the real user ever clicks. Only the POST below (the form's
+        own submission, which scanners don't perform) actually completes
+        sign-in. The response is never cached (`Cache-Control: no-store`).
+      operationId: verifyLoginConfirm
       parameters:
         - name: token
           in: query
@@ -209,15 +214,64 @@ paths:
             minLength: 1
       responses:
         '200':
+          description: Confirmation page served; token has not been consumed
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Missing token query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Login is not configured (no Resend API key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Auth]
+      summary: Consume a magic-link token and start a session
+      description: |
+        Submitted by the confirmation page's own form (GET /auth/verify
+        above). Consumes the one-time token, delivered as an HttpOnly
+        `freqshow_session` cookie, then either redirects to the configured
+        frontend URL or serves a minimal confirmation page. The response
+        is never cached (`Cache-Control: no-store`).
+      operationId: verifyLogin
+      parameters:
+        - name: token
+          in: query
+          required: false
+          description: >-
+            The one-time token, when not supplied as a form field (see
+            requestBody) — accepted either way for robustness.
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: false
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        '200':
           description: Signed in; session cookie set; confirmation page served
           content:
             text/html:
               schema:
                 type: string
-        '302':
+        '303':
           description: Signed in; session cookie set; redirected to the configured frontend URL
         '400':
-          description: Missing token query parameter
+          description: Missing token (query parameter or form field)
           content:
             application/json:
               schema:

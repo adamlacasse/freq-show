@@ -3,6 +3,8 @@ package db
 import (
 	"context"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -93,6 +95,46 @@ func TestSQLiteStoreLoginTokenLifecycle(t *testing.T) {
 		t.Fatalf("second ConsumeLoginToken returned error: %v", err)
 	} else if ok {
 		t.Fatal("expected token reuse to be rejected")
+	}
+}
+
+// TestSQLiteStoreConsumeLoginTokenIsAtomicUnderConcurrency guards against a
+// double-consume when two callers race to consume the same token (the
+// scanner-vs-human scenario the review flagged). It only asserts the
+// correctness property that matters — at most one caller ever succeeds —
+// and tolerates a "database is locked" error from the loser: without a
+// busy_timeout pragma on this DSN, modernc.org/sqlite can fail a
+// contending writer immediately rather than block, which is an acceptable
+// (if not ideal) way to lose the race, not a double-consume.
+func TestSQLiteStoreConsumeLoginTokenIsAtomicUnderConcurrency(t *testing.T) {
+	t.Parallel()
+	store := newTestSQLiteStore(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	const hash = "token-hash-concurrent"
+	if err := store.SaveLoginToken(ctx, hash, "user@example.com", now.Add(15*time.Minute)); err != nil {
+		t.Fatalf("SaveLoginToken returned error: %v", err)
+	}
+
+	const attempts = 2
+	var wg sync.WaitGroup
+	var successCount atomic.Int32
+
+	for i := 0; i < attempts; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, ok, err := store.ConsumeLoginToken(ctx, hash, now)
+			if err == nil && ok {
+				successCount.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if got := successCount.Load(); got > 1 {
+		t.Fatalf("expected at most 1 of %d concurrent consumers to succeed, got %d (double-consume)", attempts, got)
 	}
 }
 
