@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/adamlacasse/freq-show/apps/server/pkg/auth"
 )
+
 
 // sessionCookieName is the cookie that carries the opaque session token
 // issued by GET /auth/verify.
@@ -69,6 +71,7 @@ func authRequestHandler(svc AuthService, limiter *rateLimiter) http.Handler {
 			case errors.Is(err, auth.ErrMailerUnconfigured):
 				writeJSON(w, http.StatusServiceUnavailable, errorResponse{"login is not configured"})
 			default:
+				log.Printf("auth: failed to send login email to %s: %v", body.Email, err)
 				writeJSON(w, http.StatusInternalServerError, errorResponse{"failed to send login email"})
 			}
 			return
@@ -108,6 +111,7 @@ func authVerifyHandler(svc AuthService, cfg cookieConfig) http.Handler {
 				writeJSON(w, http.StatusUnauthorized, errorResponse{"sign-in link is invalid or has expired"})
 				return
 			}
+			log.Printf("auth: failed to verify token: %v", err)
 			writeJSON(w, http.StatusInternalServerError, errorResponse{"failed to complete sign-in"})
 			return
 		}
