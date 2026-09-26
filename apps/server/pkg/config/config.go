@@ -33,10 +33,13 @@ const (
 	// feature targets. Production deployments should override it with a
 	// verified sender.
 	defaultAuthEmailFrom = "FreqShow <onboarding@resend.dev>"
-	// defaultAuthBaseURL matches the default PORT above. It's the backend's
-	// own externally reachable origin, used to build the /auth/verify link
-	// embedded in login emails — not a frontend URL.
-	defaultAuthBaseURL = "http://localhost:8080"
+	// defaultAuthBaseURL matches dev.sh's standard two-process workflow: the
+	// frontend dev server on :4200 proxies /api/* to the backend on :8080
+	// (see apps/frontend/proxy.conf.json), and a magic-link email is always
+	// opened in a browser talking to that frontend origin — not directly to
+	// the backend — so the link (and the Set-Cookie response it triggers)
+	// must be built from the frontend's origin. See AuthConfig.BaseURL.
+	defaultAuthBaseURL = "http://localhost:4200/api"
 
 	// exampleDatabaseURL appears in the startup error when DATABASE_URL is
 	// missing. There is deliberately no default for it: a relative path
@@ -151,8 +154,17 @@ type AuthConfig struct {
 	ResendAPIKey string
 	// EmailFrom is the sender address for login emails.
 	EmailFrom string
-	// BaseURL is the backend's own externally reachable origin, used to
-	// build the /auth/verify link embedded in login emails.
+	// BaseURL is used to build the /auth/verify link embedded in login
+	// emails. Despite /auth/verify being a backend endpoint, this must be
+	// the origin the *browser* will use for it, not the backend service's
+	// own direct URL: the Set-Cookie response is only useful if it's seen
+	// as coming from the same origin later /discover calls actually hit.
+	// apps/frontend proxies /api/* to the backend (both in production —
+	// apps/frontend/server.ts — and in local dev — apps/frontend's
+	// proxy.conf.json), so that origin is the frontend's own URL with an
+	// /api prefix (e.g. https://freq-show.adamlacasse.dev/api), not the
+	// backend's Render URL. Calling the backend directly bypasses the
+	// proxy and sets a cookie the frontend's origin will never send back.
 	BaseURL string
 	// FrontendURL, if set, is where GET /auth/verify redirects the browser
 	// after a successful sign-in.
