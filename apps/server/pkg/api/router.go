@@ -59,6 +59,21 @@ type RouterConfig struct {
 	Embedder    embeddings.Embedder
 	Discovery   *discovery.Service
 	Collections db.CollectionRepository
+
+	// Auth is nil when magic-link login isn't configured (no
+	// RESEND_API_KEY) — /auth/request and /auth/verify then report 503,
+	// and /discover behaves exactly as it did before this feature: IP rate
+	// limiting only.
+	Auth AuthService
+
+	// CookieSecure marks the session cookie Secure (HTTPS-only). Should be
+	// true everywhere except local development over plain HTTP.
+	CookieSecure bool
+
+	// AuthFrontendURL, if set, is where GET /auth/verify redirects the
+	// browser after a successful sign-in. Empty serves a minimal
+	// confirmation page instead.
+	AuthFrontendURL string
 }
 
 // NewRouter wires the top-level HTTP routes for the backend.
@@ -78,8 +93,10 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	register("/artists/", artistLookupHandler(cfg.Artists, cfg.MusicBrainz, cfg.Wikipedia))
 	register("/albums/", albumLookupHandler(cfg.Albums, cfg.Embeddings, cfg.Embedder, cfg.MusicBrainz, cfg.Reviews))
 	register("/search", searchHandler(cfg.MusicBrainz))
-	register("/discover", discoverRateLimit(newDiscoverLimiter(), discoverHandler(cfg.Discovery)))
+	register("/discover", discoverRateLimit(newDiscoverLimiter(), newDiscoverAuthedLimiter(), cfg.Auth, discoverHandler(cfg.Discovery)))
 	register("/collections/", collectionHandler(cfg))
+	register("/auth/request", authRequestHandler(cfg.Auth, newAuthRequestLimiter()))
+	register("/auth/verify", authVerifyHandler(cfg.Auth, cookieConfig{secure: cfg.CookieSecure, frontendURL: cfg.AuthFrontendURL}))
 
 	return corsMiddleware(mux)
 }
@@ -172,7 +189,7 @@ func collectionHandler(cfg RouterConfig) http.Handler {
 					Format string `json:"format"`
 				}
 				_ = json.NewDecoder(r.Body).Decode(&req)
-				
+
 				// Ensure the album exists in the local database before adding to the collection.
 				// This guarantees the UI will have the title, artist, and year when displaying the collection.
 				_, _ = getOrFetchAlbum(r.Context(), cfg.Albums, cfg.Embeddings, cfg.Embedder, cfg.MusicBrainz, cfg.Reviews, albumID)
@@ -185,7 +202,7 @@ func collectionHandler(cfg RouterConfig) http.Handler {
 				writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 				return
 			}
-			
+
 			if r.Method == http.MethodPut || r.Method == http.MethodPatch {
 				var req struct {
 					Format           string `json:"format"`
@@ -194,7 +211,7 @@ func collectionHandler(cfg RouterConfig) http.Handler {
 					CustomYear       int    `json:"customYear"`
 				}
 				_ = json.NewDecoder(r.Body).Decode(&req)
-				
+
 				// Optional: ensure album exists on edit as well just in case
 				_, _ = getOrFetchAlbum(r.Context(), cfg.Albums, cfg.Embeddings, cfg.Embedder, cfg.MusicBrainz, cfg.Reviews, albumID)
 
@@ -206,7 +223,7 @@ func collectionHandler(cfg RouterConfig) http.Handler {
 				writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 				return
 			}
-			
+
 			if r.Method == http.MethodDelete {
 				err := cfg.Collections.RemoveAlbumFromCollection(r.Context(), userID, albumID)
 				if err != nil {
@@ -787,6 +804,13 @@ func corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.Header().Set("Access-Control-Max-Age", "86400")
+		// Required for the browser to send/receive the session cookie set
+		// by GET /auth/verify when the frontend runs on a different origin
+		// (e.g. the Angular dev server). Safe alongside the origin-echoing
+		// above since that never falls back to a literal "*" for a request
+		// that has credentials to send (only header-less, non-browser
+		// requests hit the "*" branch).
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		// Handle preflight requests
 		if r.Method == http.MethodOptions {

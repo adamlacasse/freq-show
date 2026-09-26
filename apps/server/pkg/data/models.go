@@ -65,6 +65,23 @@ type Review struct {
 	URL     string  `json:"url"`
 }
 
+// User represents an account created lazily on first successful magic-link
+// verification. There is no password — identity is the verified email
+// address itself.
+type User struct {
+	ID        string `json:"id"`
+	Email     string `json:"email"`
+	CreatedAt string `json:"createdAt"`
+}
+
+// Session represents an active login session backing a session cookie.
+// The raw session token is never stored — callers look sessions up by a
+// hash of the cookie value (see pkg/auth).
+type Session struct {
+	UserID    string `json:"userId"`
+	ExpiresAt string `json:"expiresAt"`
+}
+
 type CollectionItem struct {
 	ID               int    `json:"id"`
 	UserID           string `json:"userId"`

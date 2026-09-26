@@ -2,9 +2,12 @@ package db
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/adamlacasse/freq-show/apps/server/pkg/data"
 )
@@ -47,30 +50,90 @@ type EmbeddingRecord struct {
 	Vec  []float32
 }
 
+// AuthRepository defines persistence operations for magic-link auth: user
+// accounts, one-time login tokens, and sessions. Callers hash the raw
+// bearer token (login token or session cookie value) before it ever reaches
+// this interface — implementations only ever see and store the hash, so a
+// database dump alone can't be replayed as a working credential.
+type AuthRepository interface {
+	// GetOrCreateUserByEmail returns the user for a verified email address,
+	// creating the account on first login. Email matching is
+	// case-insensitive.
+	GetOrCreateUserByEmail(ctx context.Context, email string) (*data.User, error)
+
+	// SaveLoginToken stores a freshly issued magic-link token, identified
+	// by tokenHash (the caller's hash of the raw emailed token), with its
+	// expiry.
+	SaveLoginToken(ctx context.Context, tokenHash, email string, expiresAt time.Time) error
+
+	// ConsumeLoginToken atomically marks a login token used and returns the
+	// email it was issued for. ok is false if the token is unknown, already
+	// consumed, or expired as of now — the caller cannot distinguish these
+	// cases, which is intentional: they all mean "this link doesn't work
+	// anymore."
+	ConsumeLoginToken(ctx context.Context, tokenHash string, now time.Time) (email string, ok bool, err error)
+
+	// CreateSession persists a freshly issued session, identified by
+	// tokenHash (the caller's hash of the raw session cookie value).
+	CreateSession(ctx context.Context, tokenHash, userID string, expiresAt time.Time) error
+
+	// GetSession returns the session behind a hashed token if it exists and
+	// has not expired as of now. Returns (nil, nil) for a missing or
+	// expired session rather than an error — an expired cookie is routine,
+	// not exceptional.
+	GetSession(ctx context.Context, tokenHash string, now time.Time) (*data.Session, error)
+
+	// DeleteSession removes a session (used for logout). Deleting an
+	// already-absent session is not an error.
+	DeleteSession(ctx context.Context, tokenHash string) error
+}
+
 // Store encapsulates repository behavior with lifecycle management.
 type Store interface {
 	ArtistRepository
 	AlbumRepository
 	EmbeddingRepository
 	CollectionRepository
+	AuthRepository
 	Close(ctx context.Context) error
+}
+
+// memoryLoginToken is a login token record keyed by its hash.
+type memoryLoginToken struct {
+	email      string
+	expiresAt  time.Time
+	consumedAt time.Time // zero value means "not yet consumed"
+}
+
+// memorySession is a session record keyed by its hashed token.
+type memorySession struct {
+	userID    string
+	expiresAt time.Time
 }
 
 // MemoryStore is an in-memory persistence layer backing the application during early development.
 type MemoryStore struct {
-	mu         sync.RWMutex
-	artists    map[string]*data.Artist
-	albums     map[string]*data.Album
-	embeddings map[string]map[string][]float32 // [model][mbid] -> vec
+	mu           sync.RWMutex
+	artists      map[string]*data.Artist
+	albums       map[string]*data.Album
+	embeddings   map[string]map[string][]float32 // [model][mbid] -> vec
+	usersByID    map[string]*data.User
+	usersByEmail map[string]*data.User
+	loginTokens  map[string]*memoryLoginToken // tokenHash -> record
+	sessions     map[string]*memorySession    // tokenHash -> record
 }
 
 // NewMemoryStore constructs an in-memory store instance.
 func NewMemoryStore(ctx context.Context) (*MemoryStore, error) {
 	_ = ctx
 	return &MemoryStore{
-		artists:    make(map[string]*data.Artist),
-		albums:     make(map[string]*data.Album),
-		embeddings: make(map[string]map[string][]float32),
+		artists:      make(map[string]*data.Artist),
+		albums:       make(map[string]*data.Album),
+		embeddings:   make(map[string]map[string][]float32),
+		usersByID:    make(map[string]*data.User),
+		usersByEmail: make(map[string]*data.User),
+		loginTokens:  make(map[string]*memoryLoginToken),
+		sessions:     make(map[string]*memorySession),
 	}, nil
 }
 
@@ -311,4 +374,115 @@ func (s *MemoryStore) RemoveAlbumFromCollection(ctx context.Context, userID, alb
 // GetUserCollection retrieves the user's collection (MemoryStore dummy implementation).
 func (s *MemoryStore) GetUserCollection(ctx context.Context, userID string) ([]data.CollectionItem, error) {
 	return nil, nil
+}
+
+// GetOrCreateUserByEmail returns the user for a verified email address,
+// creating the account on first login. Email matching is case-insensitive.
+func (s *MemoryStore) GetOrCreateUserByEmail(ctx context.Context, email string) (*data.User, error) {
+	_ = ctx
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return nil, errors.New("db: email required")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if existing, ok := s.usersByEmail[email]; ok {
+		copyUser := *existing
+		return &copyUser, nil
+	}
+
+	id, err := newRandomID()
+	if err != nil {
+		return nil, err
+	}
+	user := &data.User{ID: id, Email: email, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
+	s.usersByEmail[email] = user
+	s.usersByID[id] = user
+
+	copyUser := *user
+	return &copyUser, nil
+}
+
+// SaveLoginToken stores a freshly issued magic-link token with its expiry.
+func (s *MemoryStore) SaveLoginToken(ctx context.Context, tokenHash, email string, expiresAt time.Time) error {
+	_ = ctx
+	if strings.TrimSpace(tokenHash) == "" || strings.TrimSpace(email) == "" {
+		return errors.New("db: token hash and email required")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.loginTokens[tokenHash] = &memoryLoginToken{
+		email:     strings.ToLower(strings.TrimSpace(email)),
+		expiresAt: expiresAt,
+	}
+	return nil
+}
+
+// ConsumeLoginToken atomically marks a login token used and returns the
+// email it was issued for.
+func (s *MemoryStore) ConsumeLoginToken(ctx context.Context, tokenHash string, now time.Time) (string, bool, error) {
+	_ = ctx
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	token, ok := s.loginTokens[tokenHash]
+	if !ok {
+		return "", false, nil
+	}
+	if !token.consumedAt.IsZero() || now.After(token.expiresAt) {
+		return "", false, nil
+	}
+	token.consumedAt = now
+	return token.email, true, nil
+}
+
+// CreateSession persists a freshly issued session.
+func (s *MemoryStore) CreateSession(ctx context.Context, tokenHash, userID string, expiresAt time.Time) error {
+	_ = ctx
+	if strings.TrimSpace(tokenHash) == "" || strings.TrimSpace(userID) == "" {
+		return errors.New("db: token hash and user id required")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sessions[tokenHash] = &memorySession{userID: userID, expiresAt: expiresAt}
+	return nil
+}
+
+// GetSession returns the session behind a hashed token if it exists and has
+// not expired as of now.
+func (s *MemoryStore) GetSession(ctx context.Context, tokenHash string, now time.Time) (*data.Session, error) {
+	_ = ctx
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	session, ok := s.sessions[tokenHash]
+	if !ok || now.After(session.expiresAt) {
+		return nil, nil
+	}
+	return &data.Session{UserID: session.userID, ExpiresAt: session.expiresAt.UTC().Format(time.RFC3339)}, nil
+}
+
+// DeleteSession removes a session.
+func (s *MemoryStore) DeleteSession(ctx context.Context, tokenHash string) error {
+	_ = ctx
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.sessions, tokenHash)
+	return nil
+}
+
+// newRandomID generates an opaque hex-encoded random identifier for a new
+// user record. MemoryStore has no auto-increment/UUID dependency of its
+// own, so it rolls its own rather than pulling in google/uuid just for this
+// dev-only path.
+func newRandomID() (string, error) {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
 }

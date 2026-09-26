@@ -17,6 +17,7 @@ tags:
   - name: Artists
   - name: Albums
   - name: Discovery
+  - name: Auth
 
 paths:
   /healthz:
@@ -136,6 +137,99 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           description: Discovery unavailable or index not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  /auth/request:
+    post:
+      tags: [Auth]
+      summary: Request a magic-link sign-in email
+      description: |
+        Accepts an email address and, if login is configured (RESEND_API_KEY
+        set), emails a time-limited sign-in link. The response is the same
+        whether or not the address already has an account — accounts are
+        created lazily on first successful GET /auth/verify — so this
+        endpoint cannot be used to enumerate registered emails.
+      operationId: requestLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequestBody'
+      responses:
+        '200':
+          description: Sign-in email sent (or accepted for sending)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthRequestResponse'
+        '400':
+          description: Invalid request body or malformed email address
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many login requests from this client
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Login is not configured (no Resend API key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+  /auth/verify:
+    get:
+      tags: [Auth]
+      summary: Verify a magic-link token and start a session
+      description: |
+        Exchanges a one-time magic-link token (from the emailed link) for a
+        session, delivered as an HttpOnly `freqshow_session` cookie. Either
+        redirects to the configured frontend URL or serves a minimal
+        confirmation page.
+      operationId: verifyLogin
+      parameters:
+        - name: token
+          in: query
+          required: true
+          description: The one-time token from the emailed sign-in link
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: Signed in; session cookie set; confirmation page served
+          content:
+            text/html:
+              schema:
+                type: string
+        '302':
+          description: Signed in; session cookie set; redirected to the configured frontend URL
+        '400':
+          description: Missing token query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Token is invalid, expired, or already used
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Login is not configured (no Resend API key)
           content:
             application/json:
               schema:
@@ -331,6 +425,25 @@ components:
             type: string
         lifeSpan:
           $ref: '#/components/schemas/LifeSpan'
+
+    AuthRequestBody:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    AuthRequestResponse:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+        message:
+          type: string
 
     DiscoveryQuery:
       type: object

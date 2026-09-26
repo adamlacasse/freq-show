@@ -8,12 +8,14 @@ import (
 	"syscall"
 
 	"github.com/adamlacasse/freq-show/apps/server/pkg/api"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/auth"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/config"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/db"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/discovery"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/embeddings"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/llm"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/musicbrainz"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/resend"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/reviews"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/wikipedia"
 )
@@ -108,16 +110,38 @@ func main() {
 		log.Printf("discovery disabled: missing discovery provider API key(s)")
 	}
 
+	// authService stays a nil api.AuthService (not a typed-nil *auth.Service
+	// assigned to it) when Resend isn't configured, so the router's `svc ==
+	// nil` checks in auth_handler.go work correctly and /discover falls
+	// back to IP-only rate limiting.
+	var authService api.AuthService
+	if cfg.Auth.ResendAPIKey != "" {
+		mailer, err := resend.New(resend.Config{
+			APIKey: cfg.Auth.ResendAPIKey,
+			From:   cfg.Auth.EmailFrom,
+		})
+		if err != nil {
+			log.Printf("resend client init failed; magic-link auth disabled: %v", err)
+		} else {
+			authService = auth.New(store, mailer, cfg.Auth.BaseURL)
+		}
+	} else {
+		log.Printf("magic-link auth disabled: missing RESEND_API_KEY")
+	}
+
 	router := api.NewRouter(api.RouterConfig{
-		MusicBrainz: mbClient,
-		Wikipedia:   wikiClient,
-		Reviews:     reviewsClient,
-		Artists:     store,
-		Albums:      store,
-		Embeddings:  store,
-		Collections: store,
-		Embedder:    discoveryEmbedder,
-		Discovery:   discoveryService,
+		MusicBrainz:     mbClient,
+		Wikipedia:       wikiClient,
+		Reviews:         reviewsClient,
+		Artists:         store,
+		Albums:          store,
+		Embeddings:      store,
+		Collections:     store,
+		Embedder:        discoveryEmbedder,
+		Discovery:       discoveryService,
+		Auth:            authService,
+		CookieSecure:    cfg.Env != "development",
+		AuthFrontendURL: cfg.Auth.FrontendURL,
 	})
 
 	srv := &http.Server{
