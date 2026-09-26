@@ -6,14 +6,17 @@ import (
 	"net/http"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/adamlacasse/freq-show/apps/server/pkg/api"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/auth"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/config"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/db"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/discovery"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/embeddings"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/llm"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/musicbrainz"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/resend"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/reviews"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/sources/wikipedia"
 )
@@ -108,16 +111,38 @@ func main() {
 		log.Printf("discovery disabled: missing discovery provider API key(s)")
 	}
 
+	// authService stays a nil api.AuthService (not a typed-nil *auth.Service
+	// assigned to it) when Resend isn't configured, so the router's `svc ==
+	// nil` checks in auth_handler.go work correctly and /discover falls
+	// back to IP-only rate limiting.
+	var authService api.AuthService
+	if cfg.Auth.ResendAPIKey != "" {
+		mailer, err := resend.New(resend.Config{
+			APIKey: cfg.Auth.ResendAPIKey,
+			From:   cfg.Auth.EmailFrom,
+		})
+		if err != nil {
+			log.Printf("resend client init failed; magic-link auth disabled: %v", err)
+		} else {
+			authService = auth.New(store, mailer, cfg.Auth.BaseURL)
+		}
+	} else {
+		log.Printf("magic-link auth disabled: missing RESEND_API_KEY")
+	}
+
 	router := api.NewRouter(api.RouterConfig{
-		MusicBrainz: mbClient,
-		Wikipedia:   wikiClient,
-		Reviews:     reviewsClient,
-		Artists:     store,
-		Albums:      store,
-		Embeddings:  store,
-		Collections: store,
-		Embedder:    discoveryEmbedder,
-		Discovery:   discoveryService,
+		MusicBrainz:     mbClient,
+		Wikipedia:       wikiClient,
+		Reviews:         reviewsClient,
+		Artists:         store,
+		Albums:          store,
+		Embeddings:      store,
+		Collections:     store,
+		Embedder:        discoveryEmbedder,
+		Discovery:       discoveryService,
+		Auth:            authService,
+		CookieSecure:    cfg.Env != "development",
+		AuthFrontendURL: cfg.Auth.FrontendURL,
 	})
 
 	srv := &http.Server{
@@ -134,6 +159,33 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// login_tokens and sessions otherwise grow forever: every completed
+	// login leaves one spent token row, and every session outlives its own
+	// usefulness once past its expiry. Sweep both hourly; tied to the same
+	// shutdown context as the server so it stops cleanly rather than
+	// leaking a goroutine past process shutdown.
+	go func() {
+		const authPruneInterval = time.Hour
+		ticker := time.NewTicker(authPruneInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				deleted, err := store.PruneExpiredAuth(context.Background(), time.Now())
+				if err != nil {
+					log.Printf("auth: prune of expired tokens/sessions failed: %v", err)
+					continue
+				}
+				if deleted > 0 {
+					log.Printf("auth: pruned %d expired login token/session row(s)", deleted)
+				}
+			}
+		}
+	}()
+
 	<-ctx.Done()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/adamlacasse/freq-show/apps/server/pkg/data"
+	"github.com/google/uuid"
 
 	_ "modernc.org/sqlite"
 )
@@ -259,6 +260,59 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 	_, _ = s.db.ExecContext(ctx, `ALTER TABLE collection_items ADD COLUMN custom_title TEXT`)
 	_, _ = s.db.ExecContext(ctx, `ALTER TABLE collection_items ADD COLUMN custom_year INTEGER`)
 
+	// Magic-link auth (see BACKLOG.md "Magic link authentication").
+	const createUsers = `CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        created_at TIMESTAMP NOT NULL,
+        last_login_at TIMESTAMP
+    )`
+
+	if _, err := s.db.ExecContext(ctx, createUsers); err != nil {
+		return fmt.Errorf("db: migrate users: %w", err)
+	}
+
+	// login_tokens holds hashed, one-time magic-link tokens. The raw token
+	// is only ever seen by the user's browser (as the ?token= query
+	// parameter) and is never persisted — only its SHA-256 hash is, so a
+	// database dump can't be replayed as a working login link.
+	const createLoginTokens = `CREATE TABLE IF NOT EXISTS login_tokens (
+        token_hash TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        consumed_at TIMESTAMP
+    )`
+
+	if _, err := s.db.ExecContext(ctx, createLoginTokens); err != nil {
+		return fmt.Errorf("db: migrate login_tokens: %w", err)
+	}
+
+	// No index on login_tokens.email: every query against this table
+	// (ConsumeLoginToken) looks up by token_hash, the primary key. email is
+	// stored only to hand back to GetOrCreateUserByEmail after a token is
+	// consumed, never filtered on.
+
+	// sessions holds hashed session-cookie values, mirroring login_tokens:
+	// only the hash of the cookie value is stored.
+	const createSessions = `CREATE TABLE IF NOT EXISTS sessions (
+        token_hash TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL,
+        expires_at TIMESTAMP NOT NULL
+    )`
+
+	if _, err := s.db.ExecContext(ctx, createSessions); err != nil {
+		return fmt.Errorf("db: migrate sessions: %w", err)
+	}
+
+	const createSessionsUserIdx = `CREATE INDEX IF NOT EXISTS sessions_user_id_idx
+        ON sessions (user_id)`
+
+	if _, err := s.db.ExecContext(ctx, createSessionsUserIdx); err != nil {
+		return fmt.Errorf("db: migrate sessions index: %w", err)
+	}
+
 	return nil
 }
 
@@ -404,6 +458,7 @@ func (s *SQLiteStore) AddAlbumToCollection(ctx context.Context, userID, albumID,
 	}
 	return nil
 }
+
 // UpdateCollectionItem updates format, custom_artist_name, custom_title, and custom_year for a collection item.
 func (s *SQLiteStore) UpdateCollectionItem(ctx context.Context, userID, albumID, format, customArtistName, customTitle string, customYear int) error {
 	if strings.TrimSpace(userID) == "" || strings.TrimSpace(albumID) == "" {
@@ -456,7 +511,7 @@ func (s *SQLiteStore) GetUserCollection(ctx context.Context, userID string) ([]d
 			  LEFT JOIN albums a ON c.album_id = a.id
 			  WHERE c.user_id = ?
 			  ORDER BY c.added_at DESC`
-	
+
 	rows, err := s.db.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("db: query collection: %w", err)
@@ -471,7 +526,7 @@ func (s *SQLiteStore) GetUserCollection(ctx context.Context, userID string) ([]d
 		var customTitle sql.NullString
 		var customYear sql.NullInt64
 		var albumPayload sql.NullString
-		
+
 		if err := rows.Scan(&item.ID, &item.UserID, &item.AlbumID, &item.Format, &customArtistName, &customTitle, &customYear, &addedAt, &albumPayload); err != nil {
 			return nil, fmt.Errorf("db: scan collection item: %w", err)
 		}
@@ -495,10 +550,199 @@ func (s *SQLiteStore) GetUserCollection(ctx context.Context, userID string) ([]d
 
 		items = append(items, item)
 	}
-	
+
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("db: iterate collection: %w", err)
 	}
 
 	return items, nil
+}
+
+// GetOrCreateUserByEmail returns the user for a verified email address,
+// creating the account on first login. Email matching is case-insensitive.
+func (s *SQLiteStore) GetOrCreateUserByEmail(ctx context.Context, email string) (*data.User, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return nil, errors.New("db: email required")
+	}
+
+	if user, err := s.getUserByEmail(ctx, email); err != nil {
+		return nil, err
+	} else if user != nil {
+		_, _ = s.db.ExecContext(ctx, `UPDATE users SET last_login_at = ? WHERE id = ?`, time.Now().UTC(), user.ID)
+		return user, nil
+	}
+
+	id := uuid.NewString()
+	now := time.Now().UTC()
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO users (id, email, created_at, last_login_at) VALUES (?, ?, ?, ?)`,
+		id, email, now, now,
+	)
+	if err != nil {
+		if isUniqueConstraintErr(err) {
+			// Another request created this same user concurrently between
+			// our lookup and insert above — re-read rather than failing.
+			user, readErr := s.getUserByEmail(ctx, email)
+			if readErr != nil {
+				return nil, readErr
+			}
+			if user != nil {
+				return user, nil
+			}
+		}
+		return nil, fmt.Errorf("db: insert user: %w", err)
+	}
+
+	return &data.User{ID: id, Email: email, CreatedAt: now.Format(time.RFC3339)}, nil
+}
+
+func (s *SQLiteStore) getUserByEmail(ctx context.Context, email string) (*data.User, error) {
+	row := s.db.QueryRowContext(ctx, `SELECT id, email, created_at FROM users WHERE email = ?`, email)
+
+	var user data.User
+	var createdAt time.Time
+	if err := row.Scan(&user.ID, &user.Email, &createdAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("db: query user: %w", err)
+	}
+	user.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+	return &user, nil
+}
+
+func isUniqueConstraintErr(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint")
+}
+
+// SaveLoginToken stores a freshly issued magic-link token with its expiry.
+func (s *SQLiteStore) SaveLoginToken(ctx context.Context, tokenHash, email string, expiresAt time.Time) error {
+	if strings.TrimSpace(tokenHash) == "" || strings.TrimSpace(email) == "" {
+		return errors.New("db: token hash and email required")
+	}
+
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO login_tokens (token_hash, email, created_at, expires_at) VALUES (?, ?, ?, ?)`,
+		tokenHash, strings.ToLower(strings.TrimSpace(email)), time.Now().UTC(), expiresAt.UTC(),
+	)
+	if err != nil {
+		return fmt.Errorf("db: insert login token: %w", err)
+	}
+	return nil
+}
+
+// ConsumeLoginToken atomically marks a login token used and returns the
+// email it was issued for. The UPDATE's own WHERE clause (consumed_at IS
+// NULL AND expires_at > ?) is the atomicity: a SELECT-then-UPDATE would
+// leave a window between the two statements where two near-simultaneous
+// callers (e.g. an email scanner prefetching the link and the real user
+// clicking it moments later) could both read "not yet consumed" and both
+// proceed to update, relying on SQLite's BUSY retry behavior rather than
+// the query itself to prevent a double-consume. A single conditional
+// UPDATE has no such window: only one caller's statement can be the one
+// that actually flips consumed_at, and RowsAffected tells us which.
+func (s *SQLiteStore) ConsumeLoginToken(ctx context.Context, tokenHash string, now time.Time) (string, bool, error) {
+	if strings.TrimSpace(tokenHash) == "" {
+		return "", false, nil
+	}
+
+	res, err := s.db.ExecContext(
+		ctx,
+		`UPDATE login_tokens SET consumed_at = ? WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ?`,
+		now.UTC(), tokenHash, now.UTC(),
+	)
+	if err != nil {
+		return "", false, fmt.Errorf("db: consume login token: %w", err)
+	}
+
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return "", false, fmt.Errorf("db: consume login token rows affected: %w", err)
+	}
+	if affected != 1 {
+		// Either the token doesn't exist, or it was already consumed/expired
+		// (including by a concurrent caller that won the race above).
+		return "", false, nil
+	}
+
+	row := s.db.QueryRowContext(ctx, `SELECT email FROM login_tokens WHERE token_hash = ?`, tokenHash)
+	var email string
+	if err := row.Scan(&email); err != nil {
+		return "", false, fmt.Errorf("db: query consumed login token email: %w", err)
+	}
+	return email, true, nil
+}
+
+// CreateSession persists a freshly issued session.
+func (s *SQLiteStore) CreateSession(ctx context.Context, tokenHash, userID string, expiresAt time.Time) error {
+	if strings.TrimSpace(tokenHash) == "" || strings.TrimSpace(userID) == "" {
+		return errors.New("db: token hash and user id required")
+	}
+
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)`,
+		tokenHash, userID, time.Now().UTC(), expiresAt.UTC(),
+	)
+	if err != nil {
+		return fmt.Errorf("db: insert session: %w", err)
+	}
+	return nil
+}
+
+// GetSession returns the session behind a hashed token if it exists and has
+// not expired as of now.
+func (s *SQLiteStore) GetSession(ctx context.Context, tokenHash string, now time.Time) (*data.Session, error) {
+	row := s.db.QueryRowContext(ctx, `SELECT user_id, expires_at FROM sessions WHERE token_hash = ?`, tokenHash)
+
+	var userID string
+	var expiresAt time.Time
+	if err := row.Scan(&userID, &expiresAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("db: query session: %w", err)
+	}
+	if now.After(expiresAt) {
+		return nil, nil
+	}
+	return &data.Session{UserID: userID, ExpiresAt: expiresAt.UTC().Format(time.RFC3339)}, nil
+}
+
+// DeleteSession removes a session.
+func (s *SQLiteStore) DeleteSession(ctx context.Context, tokenHash string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, tokenHash)
+	if err != nil {
+		return fmt.Errorf("db: delete session: %w", err)
+	}
+	return nil
+}
+
+// PruneExpiredAuth deletes expired/consumed login tokens and expired
+// sessions, returning the total rows removed across both.
+func (s *SQLiteStore) PruneExpiredAuth(ctx context.Context, now time.Time) (int, error) {
+	now = now.UTC()
+
+	tokensRes, err := s.db.ExecContext(ctx, `DELETE FROM login_tokens WHERE expires_at < ? OR consumed_at IS NOT NULL`, now)
+	if err != nil {
+		return 0, fmt.Errorf("db: prune login_tokens: %w", err)
+	}
+	tokensDeleted, err := tokensRes.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("db: prune login_tokens rows affected: %w", err)
+	}
+
+	sessionsRes, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at < ?`, now)
+	if err != nil {
+		return int(tokensDeleted), fmt.Errorf("db: prune sessions: %w", err)
+	}
+	sessionsDeleted, err := sessionsRes.RowsAffected()
+	if err != nil {
+		return int(tokensDeleted), fmt.Errorf("db: prune sessions rows affected: %w", err)
+	}
+
+	return int(tokensDeleted + sessionsDeleted), nil
 }

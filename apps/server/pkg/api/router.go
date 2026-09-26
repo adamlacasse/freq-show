@@ -59,6 +59,21 @@ type RouterConfig struct {
 	Embedder    embeddings.Embedder
 	Discovery   *discovery.Service
 	Collections db.CollectionRepository
+
+	// Auth is nil when magic-link login isn't configured (no
+	// RESEND_API_KEY) — /auth/request and /auth/verify then report 503,
+	// and /discover behaves exactly as it did before this feature: IP rate
+	// limiting only.
+	Auth AuthService
+
+	// CookieSecure marks the session cookie Secure (HTTPS-only). Should be
+	// true everywhere except local development over plain HTTP.
+	CookieSecure bool
+
+	// AuthFrontendURL, if set, is where GET /auth/verify redirects the
+	// browser after a successful sign-in. Empty serves a minimal
+	// confirmation page instead.
+	AuthFrontendURL string
 }
 
 // NewRouter wires the top-level HTTP routes for the backend.
@@ -78,8 +93,10 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	register("/artists/", artistLookupHandler(cfg.Artists, cfg.MusicBrainz, cfg.Wikipedia))
 	register("/albums/", albumLookupHandler(cfg.Albums, cfg.Embeddings, cfg.Embedder, cfg.MusicBrainz, cfg.Reviews))
 	register("/search", searchHandler(cfg.MusicBrainz))
-	register("/discover", discoverRateLimit(newDiscoverLimiter(), discoverHandler(cfg.Discovery)))
+	register("/discover", discoverRateLimit(newDiscoverLimiter(), newDiscoverAuthedLimiter(), cfg.Auth, discoverHandler(cfg.Discovery)))
 	register("/collections/", collectionHandler(cfg))
+	register("/auth/request", authRequestHandler(cfg.Auth, newAuthRequestLimiter()))
+	register("/auth/verify", authVerifyHandler(cfg.Auth, cookieConfig{secure: cfg.CookieSecure, frontendURL: cfg.AuthFrontendURL}))
 
 	return corsMiddleware(mux)
 }
@@ -172,7 +189,7 @@ func collectionHandler(cfg RouterConfig) http.Handler {
 					Format string `json:"format"`
 				}
 				_ = json.NewDecoder(r.Body).Decode(&req)
-				
+
 				// Ensure the album exists in the local database before adding to the collection.
 				// This guarantees the UI will have the title, artist, and year when displaying the collection.
 				_, _ = getOrFetchAlbum(r.Context(), cfg.Albums, cfg.Embeddings, cfg.Embedder, cfg.MusicBrainz, cfg.Reviews, albumID)
@@ -185,7 +202,7 @@ func collectionHandler(cfg RouterConfig) http.Handler {
 				writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 				return
 			}
-			
+
 			if r.Method == http.MethodPut || r.Method == http.MethodPatch {
 				var req struct {
 					Format           string `json:"format"`
@@ -194,7 +211,7 @@ func collectionHandler(cfg RouterConfig) http.Handler {
 					CustomYear       int    `json:"customYear"`
 				}
 				_ = json.NewDecoder(r.Body).Decode(&req)
-				
+
 				// Optional: ensure album exists on edit as well just in case
 				_, _ = getOrFetchAlbum(r.Context(), cfg.Albums, cfg.Embeddings, cfg.Embedder, cfg.MusicBrainz, cfg.Reviews, albumID)
 
@@ -206,7 +223,7 @@ func collectionHandler(cfg RouterConfig) http.Handler {
 				writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 				return
 			}
-			
+
 			if r.Method == http.MethodDelete {
 				err := cfg.Collections.RemoveAlbumFromCollection(r.Context(), userID, albumID)
 				if err != nil {
@@ -776,7 +793,15 @@ func parseSearchOffset(offsetStr string) int {
 	return 0
 }
 
-// corsMiddleware adds CORS headers for local development & production deployments
+// corsMiddleware adds CORS headers for local development & production
+// deployments. It does not set Access-Control-Allow-Credentials: both the
+// dev proxy (apps/frontend/proxy.conf.json) and prod (Render) proxy
+// /api/* same-origin, so the browser never makes a cross-origin call to
+// this API and the session cookie never needs to cross an origin either —
+// there is nothing here for that header to enable. Pairing it with an
+// arbitrary reflected Origin (as a prior version of this middleware did)
+// would instead let any site an authenticated user visits issue a
+// credentialed cross-origin request and read the response.
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")

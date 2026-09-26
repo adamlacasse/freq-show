@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -74,6 +76,27 @@ func TestDiscoverLimiterDailyCap(t *testing.T) {
 	}
 }
 
+func TestRateLimiterPrunesIdleEntries(t *testing.T) {
+	l := newLimiter(discoverBurst, discoverRatePerSec, discoverDailyCap)
+	now := time.Now()
+
+	l.allow("stale-client", now)
+
+	// Advance well past the prune age, then drive enough calls (for a
+	// different key) to cross the amortized-sweep threshold.
+	later := now.Add(rateLimiterPruneAge + time.Hour)
+	for i := 0; i < rateLimiterPruneEvery; i++ {
+		l.allow("filler-client", later)
+	}
+
+	l.mu.Lock()
+	_, stillPresent := l.state["stale-client"]
+	l.mu.Unlock()
+	if stillPresent {
+		t.Fatal("expected idle entry to be pruned")
+	}
+}
+
 func TestDiscoverLimiterDailyCapResetsAfter24Hours(t *testing.T) {
 	l := newDiscoverLimiter()
 	now := time.Now()
@@ -119,7 +142,7 @@ func TestDiscoverRateLimitMiddlewareReturns429(t *testing.T) {
 		l.allow("9.9.9.9", now)
 	}
 
-	handler := discoverRateLimit(l, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	handler := discoverRateLimit(l, newDiscoverAuthedLimiter(), nil, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -130,5 +153,159 @@ func TestDiscoverRateLimitMiddlewareReturns429(t *testing.T) {
 
 	if w.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d", w.Code)
+	}
+}
+
+// stubAuthService lets discoverRateLimit tests control session
+// authentication without depending on the real auth package.
+type stubAuthService struct {
+	authenticateFunc func(ctx context.Context, rawSessionToken string) (string, bool)
+}
+
+func (s *stubAuthService) RequestLogin(ctx context.Context, email string) error {
+	return errUnexpectedStubCall
+}
+
+func (s *stubAuthService) VerifyToken(ctx context.Context, rawToken string) (string, time.Time, error) {
+	return "", time.Time{}, errUnexpectedStubCall
+}
+
+func (s *stubAuthService) AuthenticateSession(ctx context.Context, rawSessionToken string) (string, bool) {
+	if s.authenticateFunc != nil {
+		return s.authenticateFunc(ctx, rawSessionToken)
+	}
+	return "", false
+}
+
+var errUnexpectedStubCall = errors.New("unexpected call on stubAuthService")
+
+// TestDiscoverRateLimitPrefersSessionOverIP verifies the optional-auth
+// behavior required by BACKLOG.md: a request with a valid session cookie is
+// limited per-user, even when the request's IP has already exhausted its
+// anonymous quota.
+func TestDiscoverRateLimitPrefersSessionOverIP(t *testing.T) {
+	ipLimiter := newDiscoverLimiter()
+	now := time.Now()
+	for range discoverBurst {
+		ipLimiter.allow("9.9.9.9", now)
+	}
+	if ipLimiter.allow("9.9.9.9", now) {
+		t.Fatal("test setup: expected IP limiter to be exhausted")
+	}
+
+	authn := &stubAuthService{
+		authenticateFunc: func(ctx context.Context, rawSessionToken string) (string, bool) {
+			if rawSessionToken != "valid-session" {
+				return "", false
+			}
+			return "user-1", true
+		},
+	}
+
+	handler := discoverRateLimit(ipLimiter, newDiscoverAuthedLimiter(), authn, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	r := httptest.NewRequest(http.MethodPost, "/discover", nil)
+	r.Header.Set("X-Forwarded-For", "9.9.9.9")
+	r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "valid-session"})
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected authenticated request to bypass the exhausted IP limit, got %d", w.Code)
+	}
+}
+
+// TestDiscoverRateLimitFallsBackToIPForInvalidSession covers an absent,
+// unknown, or expired session cookie: AuthenticateSession returns ok=false,
+// and the request must fall back to (and be bound by) the anonymous IP
+// limit rather than sailing through unlimited.
+func TestDiscoverRateLimitFallsBackToIPForInvalidSession(t *testing.T) {
+	ipLimiter := newDiscoverLimiter()
+	now := time.Now()
+	for range discoverBurst {
+		ipLimiter.allow("9.9.9.9", now)
+	}
+
+	authn := &stubAuthService{
+		authenticateFunc: func(ctx context.Context, rawSessionToken string) (string, bool) {
+			return "", false
+		},
+	}
+
+	handler := discoverRateLimit(ipLimiter, newDiscoverAuthedLimiter(), authn, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	r := httptest.NewRequest(http.MethodPost, "/discover", nil)
+	r.Header.Set("X-Forwarded-For", "9.9.9.9")
+	r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "stale-or-unknown"})
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected an invalid session to fall back to the exhausted IP limit, got %d", w.Code)
+	}
+}
+
+// TestDiscoverRateLimitNilAuthServiceActsAnonymous covers the pre-magic-link
+// deployment state (no RESEND_API_KEY, so RouterConfig.Auth is nil): every
+// request must be treated as anonymous, exactly as /discover behaved before
+// this feature existed.
+func TestDiscoverRateLimitNilAuthServiceActsAnonymous(t *testing.T) {
+	ipLimiter := newDiscoverLimiter()
+	now := time.Now()
+	for range discoverBurst {
+		ipLimiter.allow("9.9.9.9", now)
+	}
+
+	handler := discoverRateLimit(ipLimiter, newDiscoverAuthedLimiter(), nil, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	r := httptest.NewRequest(http.MethodPost, "/discover", nil)
+	r.Header.Set("X-Forwarded-For", "9.9.9.9")
+	r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "whatever"})
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected nil AuthService to behave anonymously (IP-limited), got %d", w.Code)
+	}
+}
+
+// TestDiscoverRateLimitAuthedUserHasOwnCap verifies the authenticated path
+// still enforces its own (more generous) cap rather than being unlimited.
+func TestDiscoverRateLimitAuthedUserHasOwnCap(t *testing.T) {
+	ipLimiter := newDiscoverLimiter()
+	userLimiter := newLimiter(1, discoverAuthedRatePerSec, discoverAuthedDailyCap)
+
+	authn := &stubAuthService{
+		authenticateFunc: func(ctx context.Context, rawSessionToken string) (string, bool) {
+			return "user-1", true
+		},
+	}
+
+	handler := discoverRateLimit(ipLimiter, userLimiter, authn, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	newReq := func() *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "/discover", nil)
+		r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "valid-session"})
+		return r
+	}
+
+	w1 := httptest.NewRecorder()
+	handler.ServeHTTP(w1, newReq())
+	if w1.Code != http.StatusOK {
+		t.Fatalf("expected first authenticated request to succeed, got %d", w1.Code)
+	}
+
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, newReq())
+	if w2.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected second authenticated request to exhaust the 1-token user bucket, got %d", w2.Code)
 	}
 }
