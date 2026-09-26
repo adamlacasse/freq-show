@@ -12,7 +12,6 @@ import (
 	"github.com/adamlacasse/freq-show/apps/server/pkg/auth"
 )
 
-
 // sessionCookieName is the cookie that carries the opaque session token
 // issued by GET /auth/verify.
 const sessionCookieName = "freqshow_session"
