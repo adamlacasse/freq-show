@@ -28,11 +28,23 @@ describe('NavigationContextService', () => {
     expect(service.getSavedSearchQuery()).toBeNull();
   });
 
-  it('round-trips album provenance', () => {
+  it('round-trips artist album provenance', () => {
     const provenance: AlbumProvenance = {
       source: 'artist',
       artistId: 'artist-1',
       artistName: 'Test Artist'
+    };
+
+    service.setAlbumProvenance(provenance);
+
+    expect(service.getAlbumProvenance()).toEqual(provenance);
+  });
+
+  it('round-trips search album provenance', () => {
+    const provenance: AlbumProvenance = {
+      source: 'search',
+      query: 'Radiohead',
+      hadResults: true
     };
 
     service.setAlbumProvenance(provenance);
@@ -51,22 +63,7 @@ describe('NavigationContextService', () => {
     expect(service.getAlbumProvenance()).toBeNull();
   });
 
-  it('round-trips had-search-results values for true and false', () => {
-    service.recordSearchResults(true);
-    expect(service.getHadSearchResults()).toBeTrue();
-
-    service.recordSearchResults(false);
-    expect(service.getHadSearchResults()).toBeFalse();
-  });
-
-  it('clears had-search-results values', () => {
-    service.recordSearchResults(true);
-    service.clearHadSearchResults();
-
-    expect(service.getHadSearchResults()).toBeFalse();
-  });
-
-  it('keeps service state independent across search query, provenance, and search results', () => {
+  it('keeps saved search query independent of album provenance', () => {
     const provenance: AlbumProvenance = {
       source: 'artist',
       artistId: 'artist-1',
@@ -75,18 +72,12 @@ describe('NavigationContextService', () => {
 
     service.saveSearchQuery('Nirvana');
     service.setAlbumProvenance(provenance);
-    service.recordSearchResults(true);
 
     service.clearSavedSearchQuery();
     expect(service.getSavedSearchQuery()).toBeNull();
     expect(service.getAlbumProvenance()).toEqual(provenance);
-    expect(service.getHadSearchResults()).toBeTrue();
 
     service.clearAlbumProvenance();
     expect(service.getAlbumProvenance()).toBeNull();
-    expect(service.getHadSearchResults()).toBeTrue();
-
-    service.clearHadSearchResults();
-    expect(service.getHadSearchResults()).toBeFalse();
   });
 });

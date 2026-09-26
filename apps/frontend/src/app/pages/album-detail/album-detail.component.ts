@@ -44,15 +44,7 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
         if (freshProvenance) {
           this.provenance = freshProvenance;
           this.navigationContextService.clearAlbumProvenance();
-        }
-
-        const hadSearchResults = this.navigationContextService.getHadSearchResults();
-        if (hadSearchResults) {
-          this.navigationContextService.clearHadSearchResults();
-        }
-
-        if (freshProvenance || hadSearchResults) {
-          this.backLabel = this.computeBackLabel(hadSearchResults);
+          this.backLabel = this.computeBackLabel();
         }
 
         const albumId = params.get('id');
@@ -78,21 +70,24 @@ export class AlbumDetailComponent implements OnInit, OnDestroy {
       this.router.navigate(['/artists', this.provenance.artistId]);
       return;
     }
+    if (this.provenance?.source === 'search') {
+      // Restore the query that led here so the home/search screen picks
+      // it back up, the same way it does for the search -> artist flow.
+      this.navigationContextService.saveSearchQuery(this.provenance.query);
+    }
     this.router.navigate(['/']);
   }
 
-  private computeBackLabel(hadSearchResults: boolean): string {
-    if (this.provenance?.source === 'artist') {
+  private computeBackLabel(): string {
+    if (!this.provenance) {
+      return 'Back to Search';
+    }
+    if (this.provenance.source === 'artist') {
       return this.provenance.artistName
         ? 'Back to ' + this.provenance.artistName
         : 'Back to Artist';
     }
-
-    // TODO(#5): Model search as explicit album provenance source when direct Search -> Album navigation exists.
-    if (this.provenance === null && hadSearchResults) {
-      return 'Back to Search Results';
-    }
-    return 'Back to Search';
+    return this.provenance.hadResults ? 'Back to Search Results' : 'Back to Search';
   }
 
   retry(): void {

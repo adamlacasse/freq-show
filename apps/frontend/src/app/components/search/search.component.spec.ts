@@ -50,7 +50,7 @@ describe('SearchComponent', () => {
 
     navigationContextService = jasmine.createSpyObj<NavigationContextService>(
       'NavigationContextService',
-      ['getSavedSearchQuery', 'clearSavedSearchQuery', 'saveSearchQuery', 'recordSearchResults']
+      ['getSavedSearchQuery', 'clearSavedSearchQuery', 'saveSearchQuery']
     );
     navigationContextService.getSavedSearchQuery.and.returnValue(null);
 
@@ -107,6 +107,5 @@ describe('SearchComponent', () => {
     component.onArtistClick(artist);
 
     expect(navigationContextService.saveSearchQuery).toHaveBeenCalledWith('Radio');
-    expect(navigationContextService.recordSearchResults).toHaveBeenCalledWith(true);
   });
 });
