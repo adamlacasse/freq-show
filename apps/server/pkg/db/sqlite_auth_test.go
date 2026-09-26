@@ -194,3 +194,57 @@ func TestSQLiteStoreGetSessionMissing(t *testing.T) {
 		t.Fatalf("expected nil for missing session, got %#v", session)
 	}
 }
+
+func TestSQLiteStorePruneExpiredAuth(t *testing.T) {
+	t.Parallel()
+	store := newTestSQLiteStore(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+
+	// A consumed token, an expired-but-unconsumed token, and a still-valid
+	// token: only the first two should be pruned.
+	if err := store.SaveLoginToken(ctx, "consumed", "user@example.com", now.Add(time.Hour)); err != nil {
+		t.Fatalf("SaveLoginToken(consumed) returned error: %v", err)
+	}
+	if _, _, err := store.ConsumeLoginToken(ctx, "consumed", now); err != nil {
+		t.Fatalf("ConsumeLoginToken returned error: %v", err)
+	}
+	if err := store.SaveLoginToken(ctx, "expired", "user@example.com", now.Add(-time.Minute)); err != nil {
+		t.Fatalf("SaveLoginToken(expired) returned error: %v", err)
+	}
+	if err := store.SaveLoginToken(ctx, "valid", "user@example.com", now.Add(time.Hour)); err != nil {
+		t.Fatalf("SaveLoginToken(valid) returned error: %v", err)
+	}
+
+	// An expired session and a still-valid session: only the first should
+	// be pruned.
+	if err := store.CreateSession(ctx, "expired-session", "user-1", now.Add(-time.Minute)); err != nil {
+		t.Fatalf("CreateSession(expired) returned error: %v", err)
+	}
+	if err := store.CreateSession(ctx, "valid-session", "user-1", now.Add(time.Hour)); err != nil {
+		t.Fatalf("CreateSession(valid) returned error: %v", err)
+	}
+
+	deleted, err := store.PruneExpiredAuth(ctx, now)
+	if err != nil {
+		t.Fatalf("PruneExpiredAuth returned error: %v", err)
+	}
+	if deleted != 3 {
+		t.Fatalf("expected 3 rows pruned, got %d", deleted)
+	}
+
+	if _, ok, _ := store.ConsumeLoginToken(ctx, "expired", now); ok {
+		t.Fatal("expected expired token to have been pruned")
+	}
+	if _, ok, _ := store.ConsumeLoginToken(ctx, "valid", now); !ok {
+		t.Fatal("expected valid token to survive pruning")
+	}
+
+	if session, _ := store.GetSession(ctx, "expired-session", now); session != nil {
+		t.Fatal("expected expired session to have been pruned")
+	}
+	if session, _ := store.GetSession(ctx, "valid-session", now); session == nil {
+		t.Fatal("expected valid session to survive pruning")
+	}
+}

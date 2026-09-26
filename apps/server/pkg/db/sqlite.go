@@ -288,12 +288,10 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 		return fmt.Errorf("db: migrate login_tokens: %w", err)
 	}
 
-	const createLoginTokensEmailIdx = `CREATE INDEX IF NOT EXISTS login_tokens_email_idx
-        ON login_tokens (email)`
-
-	if _, err := s.db.ExecContext(ctx, createLoginTokensEmailIdx); err != nil {
-		return fmt.Errorf("db: migrate login_tokens index: %w", err)
-	}
+	// No index on login_tokens.email: every query against this table
+	// (ConsumeLoginToken) looks up by token_hash, the primary key. email is
+	// stored only to hand back to GetOrCreateUserByEmail after a token is
+	// consumed, never filtered on.
 
 	// sessions holds hashed session-cookie values, mirroring login_tokens:
 	// only the hash of the cookie value is stored.
@@ -721,4 +719,30 @@ func (s *SQLiteStore) DeleteSession(ctx context.Context, tokenHash string) error
 		return fmt.Errorf("db: delete session: %w", err)
 	}
 	return nil
+}
+
+// PruneExpiredAuth deletes expired/consumed login tokens and expired
+// sessions, returning the total rows removed across both.
+func (s *SQLiteStore) PruneExpiredAuth(ctx context.Context, now time.Time) (int, error) {
+	now = now.UTC()
+
+	tokensRes, err := s.db.ExecContext(ctx, `DELETE FROM login_tokens WHERE expires_at < ? OR consumed_at IS NOT NULL`, now)
+	if err != nil {
+		return 0, fmt.Errorf("db: prune login_tokens: %w", err)
+	}
+	tokensDeleted, err := tokensRes.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("db: prune login_tokens rows affected: %w", err)
+	}
+
+	sessionsRes, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at < ?`, now)
+	if err != nil {
+		return int(tokensDeleted), fmt.Errorf("db: prune sessions: %w", err)
+	}
+	sessionsDeleted, err := sessionsRes.RowsAffected()
+	if err != nil {
+		return int(tokensDeleted), fmt.Errorf("db: prune sessions rows affected: %w", err)
+	}
+
+	return int(tokensDeleted + sessionsDeleted), nil
 }

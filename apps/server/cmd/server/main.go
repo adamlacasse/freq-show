@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/adamlacasse/freq-show/apps/server/pkg/api"
 	"github.com/adamlacasse/freq-show/apps/server/pkg/auth"
@@ -130,18 +131,19 @@ func main() {
 	}
 
 	router := api.NewRouter(api.RouterConfig{
-		MusicBrainz:     mbClient,
-		Wikipedia:       wikiClient,
-		Reviews:         reviewsClient,
-		Artists:         store,
-		Albums:          store,
-		Embeddings:      store,
-		Collections:     store,
-		Embedder:        discoveryEmbedder,
-		Discovery:       discoveryService,
-		Auth:            authService,
-		CookieSecure:    cfg.Env != "development",
-		AuthFrontendURL: cfg.Auth.FrontendURL,
+		MusicBrainz:        mbClient,
+		Wikipedia:          wikiClient,
+		Reviews:            reviewsClient,
+		Artists:            store,
+		Albums:             store,
+		Embeddings:         store,
+		Collections:        store,
+		Embedder:           discoveryEmbedder,
+		Discovery:          discoveryService,
+		Auth:               authService,
+		CookieSecure:       cfg.Env != "development",
+		AuthFrontendURL:    cfg.Auth.FrontendURL,
+		CORSAllowedOrigins: cfg.CORSAllowedOrigins,
 	})
 
 	srv := &http.Server{
@@ -158,6 +160,33 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// login_tokens and sessions otherwise grow forever: every completed
+	// login leaves one spent token row, and every session outlives its own
+	// usefulness once past its expiry. Sweep both hourly; tied to the same
+	// shutdown context as the server so it stops cleanly rather than
+	// leaking a goroutine past process shutdown.
+	go func() {
+		const authPruneInterval = time.Hour
+		ticker := time.NewTicker(authPruneInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				deleted, err := store.PruneExpiredAuth(context.Background(), time.Now())
+				if err != nil {
+					log.Printf("auth: prune of expired tokens/sessions failed: %v", err)
+					continue
+				}
+				if deleted > 0 {
+					log.Printf("auth: pruned %d expired login token/session row(s)", deleted)
+				}
+			}
+		}
+	}()
+
 	<-ctx.Done()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)

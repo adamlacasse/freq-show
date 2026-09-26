@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"html/template"
 	"log"
 	"net/http"
 	"strings"
@@ -15,6 +16,12 @@ import (
 // sessionCookieName is the cookie that carries the opaque session token
 // issued by GET /auth/verify.
 const sessionCookieName = "freqshow_session"
+
+// maxAuthRequestBodyBytes caps the size of the POST /auth/request body.
+// The real payload is a single email address; 64KiB is generous headroom
+// while still ruling out a client trying to exhaust memory with an
+// oversized request.
+const maxAuthRequestBodyBytes = 64 * 1024
 
 // AuthService captures the magic-link auth operations the router relies on.
 // Implemented by *auth.Service; declared here (rather than imported
@@ -55,6 +62,8 @@ func authRequestHandler(svc AuthService, limiter *rateLimiter) http.Handler {
 			return
 		}
 
+		r.Body = http.MaxBytesReader(w, r.Body, maxAuthRequestBodyBytes)
+
 		var body struct {
 			Email string `json:"email"`
 		}
@@ -69,8 +78,14 @@ func authRequestHandler(svc AuthService, limiter *rateLimiter) http.Handler {
 				writeJSON(w, http.StatusBadRequest, errorResponse{"a valid email address is required"})
 			case errors.Is(err, auth.ErrMailerUnconfigured):
 				writeJSON(w, http.StatusServiceUnavailable, errorResponse{"login is not configured"})
+			case errors.Is(err, auth.ErrTooManyRequests):
+				writeJSON(w, http.StatusTooManyRequests, errorResponse{"a sign-in link was already sent recently — check your email"})
 			default:
-				log.Printf("auth: failed to send login email to %s: %v", body.Email, err)
+				// Deliberately not logging body.Email alongside this: it's
+				// the one piece of PII this handler ever sees, and the
+				// failure itself (a Resend/network error) is diagnosable
+				// without it.
+				log.Printf("auth: failed to send login email: %v", err)
 				writeJSON(w, http.StatusInternalServerError, errorResponse{"failed to send login email"})
 			}
 			return
@@ -83,16 +98,41 @@ func authRequestHandler(svc AuthService, limiter *rateLimiter) http.Handler {
 	})
 }
 
-// authVerifyHandler implements GET /auth/verify?token=...: exchanges a
-// one-time magic-link token for a session cookie. On success it either
-// redirects to cfg.frontendURL (when configured) or serves a minimal
-// confirmation page — there's no single canonical frontend origin wired up
-// yet, so a hard-coded redirect target would be wrong for local dev.
+// verifyConfirmPage is served by GET /auth/verify?token=... and is
+// deliberately inert: it names the token in a form that POSTs back to this
+// same endpoint, but does not itself consume the token or set a cookie.
+//
+// This matters because GET is not actually a safe, no-side-effects request
+// here in practice: enterprise email security gateways (Microsoft Defender
+// SafeLinks, Proofpoint) and some mobile browsers automatically fetch links
+// found in incoming email — via GET — before the recipient ever opens the
+// message, to scan the destination for phishing/malware. If GET itself
+// consumed the one-time token, that automated fetch would burn it, and the
+// real user clicking the link afterward would see it as "already used."
+// Requiring an explicit form submission (POST) to actually complete
+// sign-in sidesteps this: scanners fetch and render the link, they don't
+// submit forms.
+var verifyConfirmPage = template.Must(template.New("verify-confirm").Parse(`<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Sign in to FreqShow</title></head>
+<body>
+<p>Click below to finish signing in to FreqShow.</p>
+<form method="POST" action="/auth/verify?token={{.}}">
+  <button type="submit">Complete sign-in</button>
+</form>
+</body>
+</html>`))
+
+// authVerifyHandler implements the magic-link verification endpoint.
+// GET /auth/verify?token=... renders a non-destructive confirmation page
+// (see verifyConfirmPage); POST /auth/verify?token=... — the form's own
+// submission — is what actually consumes the token, creates the session,
+// and sets the cookie. On success it either redirects to cfg.frontendURL
+// (when configured) or serves a minimal confirmation page — there's no
+// single canonical frontend origin wired up yet, so a hard-coded redirect
+// target would be wrong for local dev.
 func authVerifyHandler(svc AuthService, cfg cookieConfig) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !assertMethod(w, r, http.MethodGet) {
-			return
-		}
 		if svc == nil {
 			writeJSON(w, http.StatusServiceUnavailable, errorResponse{"login is not configured"})
 			return
@@ -104,36 +144,65 @@ func authVerifyHandler(svc AuthService, cfg cookieConfig) http.Handler {
 			return
 		}
 
-		sessionToken, expiresAt, err := svc.VerifyToken(r.Context(), token)
-		if err != nil {
-			if errors.Is(err, auth.ErrTokenInvalid) {
-				writeJSON(w, http.StatusUnauthorized, errorResponse{"sign-in link is invalid or has expired"})
-				return
-			}
-			log.Printf("auth: failed to verify token: %v", err)
-			writeJSON(w, http.StatusInternalServerError, errorResponse{"failed to complete sign-in"})
-			return
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			_ = verifyConfirmPage.Execute(w, token)
+		case http.MethodPost:
+			completeVerify(w, r, svc, cfg, token)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
-
-		setSessionCookie(w, cfg, sessionToken, expiresAt)
-
-		if cfg.frontendURL != "" {
-			http.Redirect(w, r, cfg.frontendURL, http.StatusFound)
-			return
-		}
-
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("<!doctype html><html><body><p>You're signed in to FreqShow. You can close this tab.</p></body></html>"))
 	})
 }
 
+// completeVerify performs the actual, destructive half of verification:
+// consuming the token and issuing a session. Split out from
+// authVerifyHandler so the GET path above can never reach it by accident.
+func completeVerify(w http.ResponseWriter, r *http.Request, svc AuthService, cfg cookieConfig, token string) {
+	sessionToken, expiresAt, err := svc.VerifyToken(r.Context(), token)
+	if err != nil {
+		if errors.Is(err, auth.ErrTokenInvalid) {
+			writeJSON(w, http.StatusUnauthorized, errorResponse{"sign-in link is invalid or has expired"})
+			return
+		}
+		log.Printf("auth: failed to verify token: %v", err)
+		writeJSON(w, http.StatusInternalServerError, errorResponse{"failed to complete sign-in"})
+		return
+	}
+
+	setSessionCookie(w, cfg, sessionToken, expiresAt)
+
+	if cfg.frontendURL != "" {
+		// 303 (not 302): this redirect follows a state-changing POST, and
+		// See Other is what tells the browser to GET the target regardless
+		// of the original method — the standard Post/Redirect/Get pattern.
+		http.Redirect(w, r, cfg.frontendURL, http.StatusSeeOther)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("<!doctype html><html><body><p>You're signed in to FreqShow. You can close this tab.</p></body></html>"))
+}
+
 func setSessionCookie(w http.ResponseWriter, cfg cookieConfig, token string, expiresAt time.Time) {
+	// MaxAge alongside Expires: browsers prefer MaxAge when both are
+	// present, which sidesteps any client clock skew relative to the
+	// Expires timestamp. A non-positive MaxAge would tell the browser to
+	// delete the cookie immediately, so guard the (should-never-happen)
+	// case where expiresAt is already in the past.
+	maxAge := int(time.Until(expiresAt).Seconds())
+	if maxAge < 1 {
+		maxAge = 1
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    token,
 		Path:     "/",
 		Expires:  expiresAt,
+		MaxAge:   maxAge,
 		HttpOnly: true,
 		Secure:   cfg.secure,
 		SameSite: http.SameSiteLaxMode,

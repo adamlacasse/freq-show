@@ -299,6 +299,76 @@ func TestLogoutDeletesSession(t *testing.T) {
 	}
 }
 
+func TestRequestLoginRejectsRepeatedRequestsWithinCooldown(t *testing.T) {
+	repo := newFakeRepo()
+	mailer := &fakeMailer{}
+	svc := New(repo, mailer, "https://api.example.com")
+
+	if err := svc.RequestLogin(context.Background(), "user@example.com"); err != nil {
+		t.Fatalf("first RequestLogin returned error: %v", err)
+	}
+	if mailer.calls != 1 {
+		t.Fatalf("expected 1 email sent, got %d", mailer.calls)
+	}
+
+	// Immediately requesting another link for the same address, from
+	// whatever caller/IP, must be rejected — this is the backstop against
+	// IP-rotation bypassing the per-IP limiter in front of this endpoint.
+	err := svc.RequestLogin(context.Background(), "USER@example.com") // case-insensitive match
+	if !errors.Is(err, ErrTooManyRequests) {
+		t.Fatalf("expected ErrTooManyRequests, got %v", err)
+	}
+	if mailer.calls != 1 {
+		t.Fatalf("expected no additional email sent, got %d calls", mailer.calls)
+	}
+
+	// A different address is unaffected.
+	if err := svc.RequestLogin(context.Background(), "other@example.com"); err != nil {
+		t.Fatalf("RequestLogin for a different address returned error: %v", err)
+	}
+	if mailer.calls != 2 {
+		t.Fatalf("expected 2 emails sent total, got %d", mailer.calls)
+	}
+}
+
+func TestAllowEmailRequestEnforcesCooldown(t *testing.T) {
+	svc := New(newFakeRepo(), &fakeMailer{}, "https://api.example.com")
+	now := time.Now()
+
+	if !svc.allowEmailRequest("user@example.com", now) {
+		t.Fatal("expected first request to be allowed")
+	}
+	if svc.allowEmailRequest("user@example.com", now.Add(RequestCooldown/2)) {
+		t.Fatal("expected request within cooldown to be denied")
+	}
+	if !svc.allowEmailRequest("user@example.com", now.Add(RequestCooldown+time.Second)) {
+		t.Fatal("expected request after cooldown elapses to be allowed")
+	}
+}
+
+func TestAllowEmailRequestPrunesIdleEntries(t *testing.T) {
+	svc := New(newFakeRepo(), &fakeMailer{}, "https://api.example.com")
+	now := time.Now()
+
+	if !svc.allowEmailRequest("stale@example.com", now) {
+		t.Fatal("expected initial request to be allowed")
+	}
+
+	// Advance well past both the cooldown and the prune age, then drive
+	// enough calls (for other addresses) to trigger the amortized sweep.
+	later := now.Add(requestCooldownPruneAge + time.Hour)
+	for i := 0; i < requestCooldownPruneEvery; i++ {
+		svc.allowEmailRequest("filler@example.com", later)
+	}
+
+	svc.mu.Lock()
+	_, stillPresent := svc.lastRequestAt["stale@example.com"]
+	svc.mu.Unlock()
+	if stillPresent {
+		t.Fatal("expected idle entry to be pruned")
+	}
+}
+
 func TestNewOpaqueTokenIsUnique(t *testing.T) {
 	seen := make(map[string]bool)
 	for i := 0; i < 100; i++ {

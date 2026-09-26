@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -151,7 +152,59 @@ func TestAuthRequestHandlerRateLimited(t *testing.T) {
 	}
 }
 
-func TestAuthVerifyHandlerSetsSessionCookieAndConfirmationPage(t *testing.T) {
+// TestAuthVerifyHandlerGETDoesNotConsumeToken covers the fix for the
+// email-scanner/prefetch problem: an automated GET against the link in the
+// email (Microsoft Defender SafeLinks, Proofpoint, and some mobile
+// browsers all do this before a user opens the message) must not call
+// VerifyToken — if it did, the token would be burned before the real user
+// ever clicked it.
+func TestAuthVerifyHandlerGETDoesNotConsumeToken(t *testing.T) {
+	svc := &fakeAuthService{
+		verifyTokenFunc: func(ctx context.Context, rawToken string) (string, time.Time, error) {
+			t.Fatal("GET must not call VerifyToken")
+			return "", time.Time{}, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/verify?token=good-token", nil)
+	res := httptest.NewRecorder()
+
+	authVerifyHandler(svc, cookieConfig{secure: true}).ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf(status200Fmt, res.Code)
+	}
+	if len(res.Result().Cookies()) != 0 {
+		t.Fatal("expected no cookie to be set by GET")
+	}
+	body := res.Body.String()
+	if !strings.Contains(body, `method="POST"`) {
+		t.Fatalf("expected confirmation page with a POST form, got %q", body)
+	}
+	if !strings.Contains(body, "token=good-token") {
+		t.Fatalf("expected the form to carry the token through, got %q", body)
+	}
+}
+
+// TestAuthVerifyHandlerGETEscapesTokenInPage guards against reflected XSS:
+// the token comes straight from the query string, and GET renders it back
+// into an HTML attribute.
+func TestAuthVerifyHandlerGETEscapesTokenInPage(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, `/auth/verify?token=%22%3E%3Cscript%3Ealert(1)%3C%2Fscript%3E`, nil)
+	res := httptest.NewRecorder()
+
+	authVerifyHandler(&fakeAuthService{}, cookieConfig{}).ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf(status200Fmt, res.Code)
+	}
+	body := res.Body.String()
+	if strings.Contains(body, "<script>") {
+		t.Fatalf("expected token to be escaped, got raw markup in body: %q", body)
+	}
+}
+
+func TestAuthVerifyHandlerPOSTSetsSessionCookie(t *testing.T) {
 	expiresAt := time.Now().Add(30 * 24 * time.Hour)
 	svc := &fakeAuthService{
 		verifyTokenFunc: func(ctx context.Context, rawToken string) (string, time.Time, error) {
@@ -162,7 +215,7 @@ func TestAuthVerifyHandlerSetsSessionCookieAndConfirmationPage(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/verify?token=good-token", nil)
+	req := httptest.NewRequest(http.MethodPost, "/auth/verify?token=good-token", nil)
 	res := httptest.NewRecorder()
 
 	authVerifyHandler(svc, cookieConfig{secure: true}).ServeHTTP(res, req)
@@ -191,32 +244,35 @@ func TestAuthVerifyHandlerSetsSessionCookieAndConfirmationPage(t *testing.T) {
 	if cookie.SameSite != http.SameSiteLaxMode {
 		t.Fatalf("expected SameSite=Lax, got %v", cookie.SameSite)
 	}
+	if cookie.MaxAge <= 0 {
+		t.Fatalf("expected a positive MaxAge, got %d", cookie.MaxAge)
+	}
 }
 
-func TestAuthVerifyHandlerRedirectsWhenFrontendURLConfigured(t *testing.T) {
+func TestAuthVerifyHandlerPOSTRedirectsWhenFrontendURLConfigured(t *testing.T) {
 	svc := &fakeAuthService{}
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/verify?token=good-token", nil)
+	req := httptest.NewRequest(http.MethodPost, "/auth/verify?token=good-token", nil)
 	res := httptest.NewRecorder()
 
 	authVerifyHandler(svc, cookieConfig{frontendURL: "https://app.example.com/welcome"}).ServeHTTP(res, req)
 
-	if res.Code != http.StatusFound {
-		t.Fatalf("expected status 302, got %d", res.Code)
+	if res.Code != http.StatusSeeOther {
+		t.Fatalf("expected status 303, got %d", res.Code)
 	}
 	if loc := res.Header().Get("Location"); loc != "https://app.example.com/welcome" {
 		t.Fatalf("unexpected redirect location %q", loc)
 	}
 }
 
-func TestAuthVerifyHandlerRejectsInvalidToken(t *testing.T) {
+func TestAuthVerifyHandlerPOSTRejectsInvalidToken(t *testing.T) {
 	svc := &fakeAuthService{
 		verifyTokenFunc: func(ctx context.Context, rawToken string) (string, time.Time, error) {
 			return "", time.Time{}, auth.ErrTokenInvalid
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/verify?token=bad-token", nil)
+	req := httptest.NewRequest(http.MethodPost, "/auth/verify?token=bad-token", nil)
 	res := httptest.NewRecorder()
 
 	authVerifyHandler(svc, cookieConfig{}).ServeHTTP(res, req)
@@ -230,13 +286,15 @@ func TestAuthVerifyHandlerRejectsInvalidToken(t *testing.T) {
 }
 
 func TestAuthVerifyHandlerRequiresTokenParam(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/auth/verify", nil)
-	res := httptest.NewRecorder()
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		req := httptest.NewRequest(method, "/auth/verify", nil)
+		res := httptest.NewRecorder()
 
-	authVerifyHandler(&fakeAuthService{}, cookieConfig{}).ServeHTTP(res, req)
+		authVerifyHandler(&fakeAuthService{}, cookieConfig{}).ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadRequest {
-		t.Fatalf(status400Fmt, res.Code)
+		if res.Code != http.StatusBadRequest {
+			t.Fatalf("%s: "+status400Fmt, method, res.Code)
+		}
 	}
 }
 
@@ -252,7 +310,7 @@ func TestAuthVerifyHandlerServiceUnavailableWhenNil(t *testing.T) {
 }
 
 func TestAuthVerifyHandlerMethodNotAllowed(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/auth/verify?token=x", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/auth/verify?token=x", nil)
 	res := httptest.NewRecorder()
 
 	authVerifyHandler(&fakeAuthService{}, cookieConfig{}).ServeHTTP(res, req)

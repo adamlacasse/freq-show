@@ -86,6 +86,15 @@ type AuthRepository interface {
 	// DeleteSession removes a session (used for logout). Deleting an
 	// already-absent session is not an error.
 	DeleteSession(ctx context.Context, tokenHash string) error
+
+	// PruneExpiredAuth deletes login tokens that are expired or already
+	// consumed, and sessions that are expired, returning the total rows
+	// removed across both. Neither table is otherwise ever cleaned up —
+	// every successful login leaves one spent login_tokens row and every
+	// session outlives its own usefulness once past its expiry — so
+	// without a periodic sweep both grow without bound on a long-running
+	// deployment. See cmd/server's background prune loop.
+	PruneExpiredAuth(ctx context.Context, now time.Time) (int, error)
 }
 
 // Store encapsulates repository behavior with lifecycle management.
@@ -473,6 +482,29 @@ func (s *MemoryStore) DeleteSession(ctx context.Context, tokenHash string) error
 	defer s.mu.Unlock()
 	delete(s.sessions, tokenHash)
 	return nil
+}
+
+// PruneExpiredAuth deletes expired/consumed login tokens and expired
+// sessions, returning the total rows removed across both.
+func (s *MemoryStore) PruneExpiredAuth(ctx context.Context, now time.Time) (int, error) {
+	_ = ctx
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	deleted := 0
+	for hash, token := range s.loginTokens {
+		if now.After(token.expiresAt) || !token.consumedAt.IsZero() {
+			delete(s.loginTokens, hash)
+			deleted++
+		}
+	}
+	for hash, session := range s.sessions {
+		if now.After(session.expiresAt) {
+			delete(s.sessions, hash)
+			deleted++
+		}
+	}
+	return deleted, nil
 }
 
 // newRandomID generates an opaque hex-encoded random identifier for a new

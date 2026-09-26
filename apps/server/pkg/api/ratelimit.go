@@ -52,6 +52,19 @@ type ipState struct {
 	dayReset time.Time
 }
 
+// rateLimiterPruneEvery/PruneAge amortize cleanup of a rateLimiter's state
+// map: without this, every unique IP (or "user:"+userID, or a spoofed
+// X-Forwarded-For value rotated on purpose) that ever calls allow() leaves
+// an entry behind forever, growing unbounded over a long-running process.
+// Roughly every this-many calls, entries idle longer than the prune age are
+// dropped. A counter-driven sweep — rather than a wall-clock ticker
+// goroutine — keeps this deterministic and unit-testable with the same
+// caller-supplied `now` every other method here already takes.
+const (
+	rateLimiterPruneEvery = 2048
+	rateLimiterPruneAge   = 24 * time.Hour
+)
+
 // rateLimiter is a generic per-key token-bucket-plus-daily-cap limiter. It
 // backs the anonymous IP limit on /discover, the per-user limit on
 // /discover for authenticated requests, and the per-IP limit on
@@ -64,6 +77,7 @@ type rateLimiter struct {
 	burst      float64
 	ratePerSec float64
 	dailyCap   int
+	calls      uint64 // guards the amortized prune below
 }
 
 func newLimiter(burst float64, ratePerSec float64, dailyCap int) *rateLimiter {
@@ -92,6 +106,11 @@ func newAuthRequestLimiter() *rateLimiter {
 func (l *rateLimiter) allow(key string, now time.Time) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
+	l.calls++
+	if l.calls%rateLimiterPruneEvery == 0 {
+		l.pruneLocked(now)
+	}
 
 	s, ok := l.state[key]
 	if !ok {
@@ -130,6 +149,19 @@ func (l *rateLimiter) allow(key string, now time.Time) bool {
 	s.tokens--
 	s.dayCount++
 	return true
+}
+
+// pruneLocked drops entries that have been idle for longer than
+// rateLimiterPruneAge. Callers must hold l.mu. An idle-for-a-day client's
+// bucket would be back at full and its daily count reset anyway, so
+// recreating the entry from scratch next time it appears is indistinguishable
+// from having kept it — the map just doesn't have to hold it in the meantime.
+func (l *rateLimiter) pruneLocked(now time.Time) {
+	for key, s := range l.state {
+		if now.Sub(s.lastSeen) > rateLimiterPruneAge {
+			delete(l.state, key)
+		}
+	}
 }
 
 // discoverRateLimit wraps a handler with rate limiting for the discovery

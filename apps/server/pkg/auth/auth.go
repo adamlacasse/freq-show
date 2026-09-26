@@ -13,6 +13,7 @@ import (
 	"errors"
 	"net/mail"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/adamlacasse/freq-show/apps/server/pkg/data"
@@ -35,6 +36,24 @@ const (
 	// bearer value: 256 bits, well beyond brute-force range.
 	tokenBytes   = 32
 	sessionBytes = 32
+
+	// RequestCooldown is the minimum time between two magic-link emails to
+	// the same address, independent of the caller's IP. IP-based rate
+	// limiting (pkg/api's per-IP rateLimiter on /auth/request) is easy to
+	// evade by rotating IPs or forged X-Forwarded-For values, but doing so
+	// doesn't change the target *email* — so a per-address cooldown is a
+	// backstop that protects the one thing that actually costs money and
+	// annoys a real person: how often any given inbox gets emailed.
+	RequestCooldown = 60 * time.Second
+
+	// requestCooldownPruneEvery amortizes cleanup of the per-email cooldown
+	// map: roughly every this-many RequestLogin calls, entries idle longer
+	// than requestCooldownPruneAge are dropped. Without this the map would
+	// grow by one entry per unique address ever requested and never
+	// shrink. A counter-driven sweep (rather than a wall-clock ticker
+	// goroutine) keeps this deterministic and easy to unit test.
+	requestCooldownPruneEvery = 512
+	requestCooldownPruneAge   = 24 * time.Hour
 )
 
 var (
@@ -52,6 +71,10 @@ var (
 	// ErrMailerUnconfigured is returned by RequestLogin when no Mailer was
 	// wired up (e.g. RESEND_API_KEY is unset).
 	ErrMailerUnconfigured = errors.New("auth: email delivery is not configured")
+
+	// ErrTooManyRequests is returned by RequestLogin when the same address
+	// was already sent a link within RequestCooldown.
+	ErrTooManyRequests = errors.New("auth: a sign-in link was already sent recently")
 )
 
 // Repository captures the persistence operations Service depends on. It is
@@ -72,24 +95,35 @@ type Mailer interface {
 }
 
 // Service implements magic-link issuance/verification and session lookups.
-// It holds no state of its own beyond its dependencies, so it's cheap to
-// construct and safe for concurrent use (Repository and Mailer
-// implementations are expected to be goroutine-safe, as db.Store and
-// resend.Client both are).
+// Besides its dependencies, it holds a small in-memory map for the
+// per-email request cooldown (see RequestCooldown) — safe for concurrent
+// use behind its own mutex, same as Repository and Mailer implementations
+// are expected to be (as db.Store and resend.Client both are).
 type Service struct {
 	repo    Repository
 	mailer  Mailer
-	baseURL string // e.g. https://freq-show-api.onrender.com — used to build the verification link emailed to the user
+	baseURL string // the origin embedded in the emailed verification link — see New's doc comment
+
+	mu            sync.Mutex
+	lastRequestAt map[string]time.Time // normalized email -> last RequestLogin time
+	requestCalls  uint64               // guards the amortized prune in allowEmailRequest
 }
 
-// New constructs a Service. baseURL should be the backend's own externally
-// reachable origin (no trailing slash required) since /auth/verify is a
-// backend endpoint, not a frontend route.
+// New constructs a Service. baseURL is embedded directly into the emailed
+// /auth/verify link, so it must be whatever origin a BROWSER should use to
+// reach it — not necessarily the backend's own direct URL. In this repo's
+// deployment (see apps/frontend/server.ts and proxy.conf.json), the
+// frontend proxies /api/* to the backend, and the browser only ever talks
+// to the frontend's origin; a link built from the backend's own URL sets
+// its Set-Cookie response on an origin the browser will never send back on
+// later /discover calls. Pass the frontend's origin with an /api prefix
+// (config.AuthConfig.BaseURL carries the resolved value).
 func New(repo Repository, mailer Mailer, baseURL string) *Service {
 	return &Service{
-		repo:    repo,
-		mailer:  mailer,
-		baseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"),
+		repo:          repo,
+		mailer:        mailer,
+		baseURL:       strings.TrimRight(strings.TrimSpace(baseURL), "/"),
+		lastRequestAt: make(map[string]time.Time),
 	}
 }
 
@@ -105,6 +139,9 @@ func (s *Service) RequestLogin(ctx context.Context, email string) error {
 	if s.mailer == nil {
 		return ErrMailerUnconfigured
 	}
+	if !s.allowEmailRequest(normalized, time.Now()) {
+		return ErrTooManyRequests
+	}
 
 	raw, hash, err := newOpaqueToken(tokenBytes)
 	if err != nil {
@@ -117,6 +154,30 @@ func (s *Service) RequestLogin(ctx context.Context, email string) error {
 
 	link := s.baseURL + "/auth/verify?token=" + raw
 	return s.mailer.SendMagicLink(ctx, normalized, link)
+}
+
+// allowEmailRequest enforces RequestCooldown for a single normalized
+// address, recording this attempt as the new "last requested at" time when
+// it's allowed. It also periodically prunes idle entries so the map
+// doesn't grow forever.
+func (s *Service) allowEmailRequest(email string, now time.Time) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.requestCalls++
+	if s.requestCalls%requestCooldownPruneEvery == 0 {
+		for key, last := range s.lastRequestAt {
+			if now.Sub(last) > requestCooldownPruneAge {
+				delete(s.lastRequestAt, key)
+			}
+		}
+	}
+
+	if last, ok := s.lastRequestAt[email]; ok && now.Sub(last) < RequestCooldown {
+		return false
+	}
+	s.lastRequestAt[email] = now
+	return true
 }
 
 // VerifyToken consumes a one-time magic-link token — creating the user

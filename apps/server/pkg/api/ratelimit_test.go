@@ -76,6 +76,27 @@ func TestDiscoverLimiterDailyCap(t *testing.T) {
 	}
 }
 
+func TestRateLimiterPrunesIdleEntries(t *testing.T) {
+	l := newLimiter(discoverBurst, discoverRatePerSec, discoverDailyCap)
+	now := time.Now()
+
+	l.allow("stale-client", now)
+
+	// Advance well past the prune age, then drive enough calls (for a
+	// different key) to cross the amortized-sweep threshold.
+	later := now.Add(rateLimiterPruneAge + time.Hour)
+	for i := 0; i < rateLimiterPruneEvery; i++ {
+		l.allow("filler-client", later)
+	}
+
+	l.mu.Lock()
+	_, stillPresent := l.state["stale-client"]
+	l.mu.Unlock()
+	if stillPresent {
+		t.Fatal("expected idle entry to be pruned")
+	}
+}
+
 func TestDiscoverLimiterDailyCapResetsAfter24Hours(t *testing.T) {
 	l := newDiscoverLimiter()
 	now := time.Now()

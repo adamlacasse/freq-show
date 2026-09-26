@@ -82,19 +82,27 @@ const (
 	authEmailFromEnv    = "AUTH_EMAIL_FROM"
 	authBaseURLEnv      = "AUTH_BASE_URL"
 	authFrontendURLEnv  = "AUTH_FRONTEND_URL"
+
+	corsAllowedOriginsEnv = "CORS_ALLOWED_ORIGINS"
+	// defaultCORSAllowedOrigins matches dev.sh's standard workflow: the
+	// Angular dev server on :4200. Production deployments must set
+	// CORS_ALLOWED_ORIGINS to the deployed frontend's origin(s), or the
+	// session cookie set by /auth/verify will never be honored cross-origin.
+	defaultCORSAllowedOrigins = "http://localhost:4200"
 )
 
 // Config captures runtime configuration derived from environment variables.
 type Config struct {
-	Env             string
-	Port            string
-	ShutdownTimeout time.Duration
-	MusicBrainz     MusicBrainzConfig
-	Wikipedia       WikipediaConfig
-	Reviews         ReviewsConfig
-	Database        DatabaseConfig
-	Discovery       DiscoveryConfig
-	Auth            AuthConfig
+	Env                string
+	Port               string
+	ShutdownTimeout    time.Duration
+	MusicBrainz        MusicBrainzConfig
+	Wikipedia          WikipediaConfig
+	Reviews            ReviewsConfig
+	Database           DatabaseConfig
+	Discovery          DiscoveryConfig
+	Auth               AuthConfig
+	CORSAllowedOrigins []string
 }
 
 // MusicBrainzConfig describes how the MusicBrainz client should connect.
@@ -205,19 +213,21 @@ func Load() (*Config, error) {
 
 	discovery := resolveDiscovery()
 	authCfg := resolveAuth()
+	corsAllowedOrigins := resolveCORSAllowedOrigins()
 
 	env := strings.TrimSpace(envOrDefault(environmentEnv, defaultEnv))
 
 	return &Config{
-		Env:             env,
-		Port:            port,
-		ShutdownTimeout: shutdownTimeout,
-		MusicBrainz:     musicBrainz,
-		Wikipedia:       wikipedia,
-		Reviews:         reviews,
-		Database:        database,
-		Discovery:       discovery,
-		Auth:            authCfg,
+		Env:                env,
+		Port:               port,
+		ShutdownTimeout:    shutdownTimeout,
+		MusicBrainz:        musicBrainz,
+		Wikipedia:          wikipedia,
+		Reviews:            reviews,
+		Database:           database,
+		Discovery:          discovery,
+		Auth:               authCfg,
+		CORSAllowedOrigins: corsAllowedOrigins,
 	}, nil
 }
 
@@ -439,4 +449,23 @@ func resolveAuth() AuthConfig {
 		BaseURL:      strings.TrimRight(strings.TrimSpace(envOrDefault(authBaseURLEnv, defaultAuthBaseURL)), "/"),
 		FrontendURL:  strings.TrimSpace(envOrDefault(authFrontendURLEnv, "")),
 	}
+}
+
+// resolveCORSAllowedOrigins parses CORS_ALLOWED_ORIGINS as a comma-separated
+// list of frontend origins permitted to receive
+// Access-Control-Allow-Credentials: true (see api.corsMiddleware). Origins
+// are compared verbatim against the browser's Origin header, so each entry
+// must be a bare scheme+host(+port) with no trailing slash or path, e.g.
+// https://freq-show.adamlacasse.dev — not .../api.
+func resolveCORSAllowedOrigins() []string {
+	raw := envOrDefault(corsAllowedOriginsEnv, defaultCORSAllowedOrigins)
+	parts := strings.Split(raw, ",")
+	origins := make([]string, 0, len(parts))
+	for _, part := range parts {
+		origin := strings.TrimRight(strings.TrimSpace(part), "/")
+		if origin != "" {
+			origins = append(origins, origin)
+		}
+	}
+	return origins
 }
