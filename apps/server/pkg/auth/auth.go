@@ -82,6 +82,7 @@ var (
 // locally to keep this package independent of pkg/db's import graph.
 type Repository interface {
 	GetOrCreateUserByEmail(ctx context.Context, email string) (*data.User, error)
+	GetUser(ctx context.Context, id string) (*data.User, error)
 	SaveLoginToken(ctx context.Context, tokenHash, email string, expiresAt time.Time) error
 	ConsumeLoginToken(ctx context.Context, tokenHash string, now time.Time) (email string, ok bool, err error)
 	CreateSession(ctx context.Context, tokenHash, userID string, expiresAt time.Time) error
@@ -232,6 +233,21 @@ func (s *Service) AuthenticateSession(ctx context.Context, rawSessionToken strin
 		return "", false
 	}
 	return session.UserID, true
+}
+
+// GetCurrentUser resolves a raw session token to its User entity.
+// Returns (nil, nil) if the session is missing, expired, or invalid.
+func (s *Service) GetCurrentUser(ctx context.Context, rawSessionToken string) (*data.User, error) {
+	rawSessionToken = strings.TrimSpace(rawSessionToken)
+	if rawSessionToken == "" {
+		return nil, nil
+	}
+
+	session, err := s.repo.GetSession(ctx, hashToken(rawSessionToken), time.Now().UTC())
+	if err != nil || session == nil {
+		return nil, err
+	}
+	return s.repo.GetUser(ctx, session.UserID)
 }
 
 // Logout deletes the session behind a raw cookie value, if any.

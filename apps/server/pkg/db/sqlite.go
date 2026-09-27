@@ -598,6 +598,27 @@ func (s *SQLiteStore) GetOrCreateUserByEmail(ctx context.Context, email string) 
 	return &data.User{ID: id, Email: email, CreatedAt: now.Format(time.RFC3339)}, nil
 }
 
+// GetUser returns the user with the given ID, or (nil, nil) if not found.
+func (s *SQLiteStore) GetUser(ctx context.Context, id string) (*data.User, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, nil
+	}
+
+	row := s.db.QueryRowContext(ctx, `SELECT id, email, created_at FROM users WHERE id = ?`, id)
+
+	var user data.User
+	var createdAt time.Time
+	if err := row.Scan(&user.ID, &user.Email, &createdAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("db: query user by id: %w", err)
+	}
+	user.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+	return &user, nil
+}
+
 func (s *SQLiteStore) getUserByEmail(ctx context.Context, email string) (*data.User, error) {
 	row := s.db.QueryRowContext(ctx, `SELECT id, email, created_at FROM users WHERE email = ?`, email)
 

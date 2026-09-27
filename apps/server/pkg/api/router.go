@@ -95,8 +95,11 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	register("/search", searchHandler(cfg.MusicBrainz))
 	register("/discover", discoverRateLimit(newDiscoverLimiter(), newDiscoverAuthedLimiter(), cfg.Auth, discoverHandler(cfg.Discovery)))
 	register("/collections/", collectionHandler(cfg))
+	cookieCfg := cookieConfig{secure: cfg.CookieSecure, frontendURL: cfg.AuthFrontendURL}
 	register("/auth/request", authRequestHandler(cfg.Auth, newAuthRequestLimiter()))
-	register("/auth/verify", authVerifyHandler(cfg.Auth, cookieConfig{secure: cfg.CookieSecure, frontendURL: cfg.AuthFrontendURL}))
+	register("/auth/verify", authVerifyHandler(cfg.Auth, cookieCfg))
+	register("/auth/me", authMeHandler(cfg.Auth))
+	register("/auth/logout", authLogoutHandler(cfg.Auth, cookieCfg))
 
 	return corsMiddleware(mux)
 }

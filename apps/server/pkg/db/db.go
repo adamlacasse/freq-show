@@ -61,6 +61,9 @@ type AuthRepository interface {
 	// case-insensitive.
 	GetOrCreateUserByEmail(ctx context.Context, email string) (*data.User, error)
 
+	// GetUser returns the user with the given ID, or (nil, nil) if not found.
+	GetUser(ctx context.Context, id string) (*data.User, error)
+
 	// SaveLoginToken stores a freshly issued magic-link token, identified
 	// by tokenHash (the caller's hash of the raw emailed token), with its
 	// expiry.
@@ -410,6 +413,25 @@ func (s *MemoryStore) GetOrCreateUserByEmail(ctx context.Context, email string) 
 	s.usersByEmail[email] = user
 	s.usersByID[id] = user
 
+	copyUser := *user
+	return &copyUser, nil
+}
+
+// GetUser returns the user with the given ID, or (nil, nil) if not found.
+func (s *MemoryStore) GetUser(ctx context.Context, id string) (*data.User, error) {
+	_ = ctx
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, nil
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	user, ok := s.usersByID[id]
+	if !ok {
+		return nil, nil
+	}
 	copyUser := *user
 	return &copyUser, nil
 }

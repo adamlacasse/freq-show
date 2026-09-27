@@ -290,3 +290,37 @@ func TestSQLiteStorePruneExpiredAuth(t *testing.T) {
 		t.Fatal("expected valid session to survive pruning")
 	}
 }
+
+func TestSQLiteStoreGetUser(t *testing.T) {
+	ctx := context.Background()
+	store := newTestSQLiteStore(t)
+
+	created, err := store.GetOrCreateUserByEmail(ctx, "user@example.com")
+	if err != nil {
+		t.Fatalf("GetOrCreateUserByEmail returned error: %v", err)
+	}
+
+	found, err := store.GetUser(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetUser returned error: %v", err)
+	}
+	if found == nil || found.ID != created.ID || found.Email != "user@example.com" {
+		t.Fatalf("expected user %#v, got %#v", created, found)
+	}
+
+	missing, err := store.GetUser(ctx, "nonexistent-id")
+	if err != nil {
+		t.Fatalf("GetUser(missing) returned error: %v", err)
+	}
+	if missing != nil {
+		t.Fatalf("expected nil for missing user, got %#v", missing)
+	}
+
+	empty, err := store.GetUser(ctx, "")
+	if err != nil {
+		t.Fatalf("GetUser(\"\") returned error: %v", err)
+	}
+	if empty != nil {
+		t.Fatalf("expected nil for empty user id, got %#v", empty)
+	}
+}

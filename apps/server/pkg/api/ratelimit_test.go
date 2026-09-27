@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/adamlacasse/freq-show/apps/server/pkg/data"
 )
 
 func TestDiscoverLimiterAllowsUpToBurst(t *testing.T) {
@@ -175,6 +177,14 @@ func (s *stubAuthService) AuthenticateSession(ctx context.Context, rawSessionTok
 		return s.authenticateFunc(ctx, rawSessionToken)
 	}
 	return "", false
+}
+
+func (s *stubAuthService) GetCurrentUser(ctx context.Context, rawSessionToken string) (*data.User, error) {
+	return nil, errUnexpectedStubCall
+}
+
+func (s *stubAuthService) Logout(ctx context.Context, rawSessionToken string) error {
+	return errUnexpectedStubCall
 }
 
 var errUnexpectedStubCall = errors.New("unexpected call on stubAuthService")

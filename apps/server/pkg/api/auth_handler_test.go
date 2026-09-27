@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/adamlacasse/freq-show/apps/server/pkg/auth"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/data"
 )
 
 // fakeAuthService is a hand-rolled AuthService for handler tests — separate
@@ -21,6 +22,8 @@ type fakeAuthService struct {
 	requestLoginFunc        func(ctx context.Context, email string) error
 	verifyTokenFunc         func(ctx context.Context, rawToken string) (string, time.Time, error)
 	authenticateSessionFunc func(ctx context.Context, rawSessionToken string) (string, bool)
+	getCurrentUserFunc      func(ctx context.Context, rawSessionToken string) (*data.User, error)
+	logoutFunc              func(ctx context.Context, rawSessionToken string) error
 }
 
 func (f *fakeAuthService) RequestLogin(ctx context.Context, email string) error {
@@ -42,6 +45,20 @@ func (f *fakeAuthService) AuthenticateSession(ctx context.Context, rawSessionTok
 		return f.authenticateSessionFunc(ctx, rawSessionToken)
 	}
 	return "", false
+}
+
+func (f *fakeAuthService) GetCurrentUser(ctx context.Context, rawSessionToken string) (*data.User, error) {
+	if f.getCurrentUserFunc != nil {
+		return f.getCurrentUserFunc(ctx, rawSessionToken)
+	}
+	return nil, nil
+}
+
+func (f *fakeAuthService) Logout(ctx context.Context, rawSessionToken string) error {
+	if f.logoutFunc != nil {
+		return f.logoutFunc(ctx, rawSessionToken)
+	}
+	return nil
 }
 
 func TestAuthRequestHandlerSendsLink(t *testing.T) {
@@ -336,5 +353,114 @@ func TestReadSessionCookie(t *testing.T) {
 	}
 	if token != "abc123" {
 		t.Fatalf("unexpected token %q", token)
+	}
+}
+
+func TestAuthMeHandlerUnauthorizedWhenNoCookie(t *testing.T) {
+	svc := &fakeAuthService{}
+	req := httptest.NewRequest(http.MethodGet, "/auth/me", nil)
+	res := httptest.NewRecorder()
+
+	authMeHandler(svc).ServeHTTP(res, req)
+
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d", res.Code)
+	}
+	if res.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("expected Cache-Control: no-store, got %q", res.Header().Get("Cache-Control"))
+	}
+}
+
+func TestAuthMeHandlerUnauthorizedWhenInvalidToken(t *testing.T) {
+	svc := &fakeAuthService{
+		getCurrentUserFunc: func(ctx context.Context, rawSessionToken string) (*data.User, error) {
+			return nil, nil
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/auth/me", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "expired-or-bad"})
+	res := httptest.NewRecorder()
+
+	authMeHandler(svc).ServeHTTP(res, req)
+
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d", res.Code)
+	}
+}
+
+func TestAuthMeHandlerReturnsUserWhenAuthenticated(t *testing.T) {
+	svc := &fakeAuthService{
+		getCurrentUserFunc: func(ctx context.Context, rawSessionToken string) (*data.User, error) {
+			if rawSessionToken == "valid-token" {
+				return &data.User{ID: "user-123", Email: "user@example.com", CreatedAt: "2026-09-27T12:00:00Z"}, nil
+			}
+			return nil, nil
+		},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/auth/me", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "valid-token"})
+	res := httptest.NewRecorder()
+
+	authMeHandler(svc).ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+
+	var user data.User
+	if err := json.NewDecoder(res.Body).Decode(&user); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if user.ID != "user-123" || user.Email != "user@example.com" {
+		t.Fatalf("unexpected user: %#v", user)
+	}
+}
+
+func TestAuthMeHandlerServiceUnavailableWhenNil(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/auth/me", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "valid-token"})
+	res := httptest.NewRecorder()
+
+	authMeHandler(nil).ServeHTTP(res, req)
+
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d", res.Code)
+	}
+}
+
+func TestAuthLogoutHandlerClearsCookieAndCallsService(t *testing.T) {
+	var loggedOutToken string
+	svc := &fakeAuthService{
+		logoutFunc: func(ctx context.Context, rawSessionToken string) error {
+			loggedOutToken = rawSessionToken
+			return nil
+		},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "session-to-clear"})
+	res := httptest.NewRecorder()
+
+	authLogoutHandler(svc, cookieConfig{secure: true}).ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+	if loggedOutToken != "session-to-clear" {
+		t.Fatalf("expected Logout to receive 'session-to-clear', got %q", loggedOutToken)
+	}
+
+	cookies := res.Result().Cookies()
+	var cleared *http.Cookie
+	for _, c := range cookies {
+		if c.Name == sessionCookieName {
+			cleared = c
+			break
+		}
+	}
+	if cleared == nil {
+		t.Fatal("expected cleared cookie in response")
+	}
+	if cleared.MaxAge != -1 || cleared.Value != "" {
+		t.Fatalf("expected cleared cookie with MaxAge -1, got MaxAge=%d, Value=%q", cleared.MaxAge, cleared.Value)
 	}
 }

@@ -6,7 +6,7 @@
 
 - **Contextual back navigation from album pages** — Shipped 2026-04-16 (PR #4), with navigation provenance refactored to a typed variant on 2026-09-27 (PR #9). Album pages opened from an artist page show a `Back to Artist` action. Navigation provenance is modeled as a typed variant on `NavigationContextService` rather than a separate ad-hoc flag, preparing the service for direct search return flows.
 
-- **Magic link authentication (Backend)** — Shipped 2026-09-26 (PR #10). Passwordless email login via Resend, backed by new `users`/`login_tokens`/`sessions` SQLite tables. `POST /auth/request` issues a one-time token; `GET`/`POST /auth/verify` confirms and consumes it (split to avoid email-scanner prefetch burning the token) and sets a session cookie. `/discover` stays optionally authenticated: anonymous requests keep the per-IP limit, logged-in requests get a more generous per-user limit. Hardened post-review: CORS credential handling, atomic token consumption, per-email request cooldown, rate-limiter eviction sweep.
+- **Magic link authentication** — Passwordless email login via Resend, backed by `users`/`login_tokens`/`sessions` SQLite tables, with client-side session management in Angular. Backend provides `POST /auth/request`, `GET`/`POST /auth/verify` (split to avoid email-scanner prefetch burning tokens), `GET /auth/me`, and `POST /auth/logout`. Frontend includes a passwordless magic-link sign-in modal, session state management via `AuthService`, dynamic navigation controls with email display and sign-out, collection routing, rate-limit prompts, and regenerated OpenAPI TypeScript types.
 
 ## Downstream (ride on `album_embeddings` table)
 
@@ -23,7 +23,9 @@
 
 ## Auth / Personalization
 
-- **Frontend authentication UI** — Build the client-side login and session experience in Angular: sign-in modal/page for requesting a magic link, session state service, auth status and sign-out controls in navigation, and regenerated OpenAPI types (`apps/frontend/src/app/models/openapi-types.generated.ts`).
+- **User-specific collection under auth** — Place collection access and mutation under authentication so collections are strictly user-specific. Enforce session verification on collection mutations (`POST /collections/:userId/albums/:albumId`, update, delete) to ensure users can only modify their own collection, and update frontend routing so "My Collection" resolves to the authenticated user's collection.
+
+- **User profiles & account management** — Enable users to manage their own profile details (display name, bio, avatar, music tastes/preferences) in addition to their record collection.
 
 - **Personalization follow-ons** — Once users can authenticate through the UI, natural next steps: query history, saved picks, and preference memory tied to the logged-in user.
 

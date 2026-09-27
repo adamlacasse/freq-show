@@ -116,13 +116,13 @@ func (c *Client) SendMagicLink(ctx context.Context, toEmail, link string) error 
 }
 
 func magicLinkText(link string) string {
-	return "Sign in to FreqShow:\n\n" + link +
+	return "Sign in to FreqShow!:\n\n" + link +
 		"\n\nThis link expires in 15 minutes. If you didn't request it, you can safely ignore this email."
 }
 
 func magicLinkHTML(link string) string {
 	return fmt.Sprintf(
-		`<p>Sign in to FreqShow:</p><p><a href="%s">%s</a></p><p>This link expires in 15 minutes. If you didn't request it, you can safely ignore this email.</p>`,
+		`<p>Sign in to FreqShow!:</p><p><a href="%s">%s</a></p><p>This link expires in 15 minutes. If you didn't request it, you can safely ignore this email.</p>`,
 		link, link,
 	)
 }

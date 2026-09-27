@@ -1,0 +1,132 @@
+@if (authService.isModalOpen()) {
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="auth-modal-title"
+  >
+    <!-- Backdrop -->
+    <div
+      class="fixed inset-0 bg-freq-ink/80 backdrop-blur-sm transition-opacity"
+      aria-hidden="true"
+      (click)="close()"
+    ></div>
+
+    <!-- Modal Box -->
+    <div
+      class="relative w-full max-w-md transform overflow-hidden rounded-3xl border border-white/15 bg-freq-midnight p-6 text-left shadow-2xl transition-all sm:p-8"
+      (click)="$event.stopPropagation()"
+    >
+      <!-- Close Button -->
+      <button
+        type="button"
+        (click)="close()"
+        aria-label="Close modal"
+        class="absolute right-4 top-4 rounded-full p-2 text-freq-cream/60 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-freq-teal"
+      >
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
+      @if (!submittedEmail()) {
+        <!-- Sign-in Request View -->
+        <div class="mb-6">
+          <div class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-freq-teal/15 text-freq-teal mb-4">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h2 id="auth-modal-title" class="text-xl font-bold tracking-tight text-white">
+            Sign in to FreqShow!
+          </h2>
+          <p class="mt-2 text-sm text-freq-cream/70">
+            Enter your email address to receive a secure, passwordless magic link to sign in.
+          </p>
+        </div>
+
+        @if (errorMessage()) {
+          <div class="mb-5 rounded-2xl border border-freq-rose/30 bg-freq-rose/10 p-3.5 text-xs text-freq-rose">
+            {{ errorMessage() }}
+          </div>
+        }
+
+        <form (ngSubmit)="onSubmit()" class="space-y-4">
+          <div>
+            <label for="auth-email-input" class="block text-xs font-semibold uppercase tracking-wider text-freq-cream/60 mb-2">
+              Email Address
+            </label>
+            <input
+              #emailInput
+              id="auth-email-input"
+              type="email"
+              name="email"
+              [(ngModel)]="email"
+              required
+              autocomplete="email"
+              inputmode="email"
+              placeholder="you@example.com"
+              [disabled]="isSubmitting()"
+              class="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white placeholder-freq-cream/40 backdrop-blur transition focus:border-freq-teal focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-freq-teal/50 disabled:opacity-50"
+            />
+          </div>
+
+          <button
+            type="submit"
+            [disabled]="isSubmitting() || !email.trim()"
+            class="flex w-full items-center justify-center gap-2 rounded-xl bg-freq-teal px-4 py-3 text-sm font-semibold text-freq-ink transition hover:bg-freq-teal/90 focus:outline-none focus:ring-2 focus:ring-freq-teal/50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            @if (isSubmitting()) {
+              <div class="h-4 w-4 animate-spin rounded-full border-2 border-freq-ink border-t-transparent"></div>
+              <span>Sending link...</span>
+            } @else {
+              <span>Send magic link</span>
+            }
+          </button>
+        </form>
+
+        <p class="mt-4 text-center text-xs text-freq-cream/50">
+          No password needed. New accounts are created automatically.
+        </p>
+      } @else {
+        <!-- Sent Confirmation View -->
+        <div class="text-center py-2">
+          <div class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-freq-teal/20 text-freq-teal mb-4">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 id="auth-modal-title" class="text-xl font-bold tracking-tight text-white">
+            Check your email
+          </h2>
+          <p class="mt-2 text-sm text-freq-cream/70">
+            We sent a sign-in link to:
+          </p>
+          <div class="mt-2 inline-block rounded-lg bg-white/10 px-3 py-1 font-mono text-sm font-semibold text-freq-cream">
+            {{ submittedEmail() }}
+          </div>
+          <p class="mt-4 text-xs text-freq-cream/60">
+            Click the link in the email to complete sign-in. You can safely close this window.
+          </p>
+
+          <div class="mt-6 flex flex-col gap-2">
+            <button
+              type="button"
+              (click)="close()"
+              class="w-full rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
+            >
+              Done
+            </button>
+            <button
+              type="button"
+              (click)="tryAnotherEmail()"
+              class="text-xs text-freq-cream/60 hover:text-white transition py-1"
+            >
+              Use a different email
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+}

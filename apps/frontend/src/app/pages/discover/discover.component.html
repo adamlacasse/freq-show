@@ -68,7 +68,16 @@
 
     @if (error) {
       <div class="rounded-2xl border border-freq-rose/30 bg-freq-rose/10 px-4 py-3 text-sm text-freq-rose">
-        {{ error }}
+        <p>{{ error }}</p>
+        @if (isRateLimited && !authService.isAuthenticated()) {
+          <button
+            type="button"
+            (click)="authService.openModal()"
+            class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-freq-rose/40 bg-freq-rose/20 px-3 py-1 text-xs font-semibold text-white transition hover:bg-freq-rose/30"
+          >
+            Sign in with email
+          </button>
+        }
       </div>
     }
   </form>

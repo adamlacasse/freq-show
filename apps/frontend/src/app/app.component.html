@@ -16,9 +16,32 @@
           <a routerLink="/discover" class="rounded-full border border-white/10 px-3 py-1 text-freq-cream transition hover:border-white/30 hover:bg-white/10">
             Discover
           </a>
-          <a routerLink="/collections/adam" class="rounded-full border border-white/10 px-3 py-1 text-freq-cream transition hover:border-white/30 hover:bg-white/10">
+          <a [routerLink]="collectionRoute()" class="rounded-full border border-white/10 px-3 py-1 text-freq-cream transition hover:border-white/30 hover:bg-white/10">
             My Collection
           </a>
+
+          @if (authService.isAuthenticated()) {
+            <div class="flex items-center gap-2 pl-2">
+              <span class="max-w-[160px] truncate text-xs text-freq-cream/60" [title]="authService.currentUser()?.email">
+                {{ authService.currentUser()?.email }}
+              </span>
+              <button
+                type="button"
+                (click)="onSignOut()"
+                class="rounded-full border border-white/10 px-3 py-1 text-xs text-freq-cream/80 transition hover:border-freq-rose/50 hover:bg-freq-rose/10 hover:text-freq-rose"
+              >
+                Sign Out
+              </button>
+            </div>
+          } @else {
+            <button
+              type="button"
+              (click)="onSignIn()"
+              class="rounded-full border border-freq-teal/40 bg-freq-teal/10 px-3.5 py-1 text-xs font-semibold text-freq-teal transition hover:border-freq-teal/80 hover:bg-freq-teal/20"
+            >
+              Sign In
+            </button>
+          }
         </nav>
       </div>
     </header>
@@ -41,4 +64,6 @@
       </div>
     </footer>
   </div>
+
+  <app-auth-modal />
 </div>

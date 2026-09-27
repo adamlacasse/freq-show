@@ -57,6 +57,15 @@ func (r *fakeRepo) GetOrCreateUserByEmail(ctx context.Context, email string) (*d
 	return u, nil
 }
 
+func (r *fakeRepo) GetUser(ctx context.Context, id string) (*data.User, error) {
+	for _, u := range r.usersByEmail {
+		if u.ID == id {
+			return u, nil
+		}
+	}
+	return nil, nil
+}
+
 func (r *fakeRepo) SaveLoginToken(ctx context.Context, tokenHash, email string, expiresAt time.Time) error {
 	r.loginTokens[tokenHash] = &fakeLoginToken{email: email, expiresAt: expiresAt}
 	return nil
@@ -399,4 +408,49 @@ func extractToken(t *testing.T, link string) string {
 		t.Fatalf("link has no token query param: %q", link)
 	}
 	return link[idx+len("token="):]
+}
+
+func TestGetCurrentUser(t *testing.T) {
+	repo := newFakeRepo()
+	mailer := &fakeMailer{}
+	svc := New(repo, mailer, "https://example.com/api")
+
+	// 1. Missing or blank token returns nil, nil
+	if u, err := svc.GetCurrentUser(context.Background(), ""); err != nil || u != nil {
+		t.Fatalf("expected nil user for blank token, got %#v, %v", u, err)
+	}
+
+	// 2. Invalid session token returns nil, nil
+	if u, err := svc.GetCurrentUser(context.Background(), "invalid-token"); err != nil || u != nil {
+		t.Fatalf("expected nil user for unknown token, got %#v, %v", u, err)
+	}
+
+	// 3. Valid login and verify flow produces a working session
+	if err := svc.RequestLogin(context.Background(), "test@example.com"); err != nil {
+		t.Fatalf("RequestLogin returned error: %v", err)
+	}
+	token := extractToken(t, mailer.sentLink)
+	sessionToken, _, err := svc.VerifyToken(context.Background(), token)
+	if err != nil {
+		t.Fatalf("VerifyToken returned error: %v", err)
+	}
+
+	user, err := svc.GetCurrentUser(context.Background(), sessionToken)
+	if err != nil {
+		t.Fatalf("GetCurrentUser returned error: %v", err)
+	}
+	if user == nil {
+		t.Fatal("expected user to be returned for active session")
+	}
+	if user.Email != "test@example.com" {
+		t.Fatalf("expected email test@example.com, got %q", user.Email)
+	}
+
+	// 4. Logout invalidates session
+	if err := svc.Logout(context.Background(), sessionToken); err != nil {
+		t.Fatalf("Logout returned error: %v", err)
+	}
+	if u, err := svc.GetCurrentUser(context.Background(), sessionToken); err != nil || u != nil {
+		t.Fatalf("expected nil user after logout, got %#v, %v", u, err)
+	}
 }

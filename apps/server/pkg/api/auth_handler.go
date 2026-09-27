@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/adamlacasse/freq-show/apps/server/pkg/auth"
+	"github.com/adamlacasse/freq-show/apps/server/pkg/data"
 )
 
 // sessionCookieName is the cookie that carries the opaque session token
@@ -31,6 +32,8 @@ type AuthService interface {
 	RequestLogin(ctx context.Context, email string) error
 	VerifyToken(ctx context.Context, rawToken string) (sessionToken string, expiresAt time.Time, err error)
 	AuthenticateSession(ctx context.Context, rawSessionToken string) (userID string, ok bool)
+	GetCurrentUser(ctx context.Context, rawSessionToken string) (*data.User, error)
+	Logout(ctx context.Context, rawSessionToken string) error
 }
 
 // cookieConfig captures the deployment-specific bits of the session cookie:
@@ -113,14 +116,104 @@ func authRequestHandler(svc AuthService, limiter *rateLimiter) http.Handler {
 // sign-in sidesteps this: scanners fetch and render the link, they don't
 // submit forms.
 var verifyConfirmPage = template.Must(template.New("verify-confirm").Parse(`<!doctype html>
-<html>
-<head><meta charset="utf-8"><title>Sign in to FreqShow</title></head>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in to FreqShow!</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #0f172a;
+      color: #f5f1e0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(251, 113, 133, 0.12), transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(45, 212, 191, 0.1), transparent 50%);
+    }
+    .card {
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 1.5rem;
+      padding: 2.5rem 2rem;
+      max-width: 26rem;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .icon-badge {
+      width: 3.5rem;
+      height: 3.5rem;
+      background: rgba(45, 212, 191, 0.15);
+      color: #2dd4bf;
+      border-radius: 1rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.25rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      color: #ffffff;
+      margin-bottom: 0.5rem;
+    }
+    p {
+      color: rgba(245, 241, 224, 0.7);
+      font-size: 0.925rem;
+      line-height: 1.5;
+      margin-bottom: 1.75rem;
+    }
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 0.875rem 1.5rem;
+      background: #2dd4bf;
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: none;
+      border-radius: 0.75rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background-color 0.15s ease, transform 0.1s ease;
+    }
+    .btn:hover {
+      background: #14b8a6;
+    }
+    .btn:active {
+      transform: scale(0.98);
+    }
+    .footer {
+      margin-top: 1.5rem;
+      font-size: 0.75rem;
+      color: rgba(245, 241, 224, 0.4);
+    }
+  </style>
+</head>
 <body>
-<p>Click below to finish signing in to FreqShow.</p>
-<form method="POST" action="">
-  <input type="hidden" name="token" value="{{.}}">
-  <button type="submit">Complete sign-in</button>
-</form>
+  <div class="card">
+    <div class="icon-badge">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M13.8 12H3"/>
+      </svg>
+    </div>
+    <h1>Sign in to FreqShow!</h1>
+    <p>Click below to complete your sign-in and open your session.</p>
+    <form method="POST" action="">
+      <input type="hidden" name="token" value="{{.}}">
+      <button class="btn" type="submit">Complete sign-in</button>
+    </form>
+    <div class="footer">FreqShow &bull; Liner notes for music lovers</div>
+  </div>
 </body>
 </html>`))
 
@@ -208,8 +301,104 @@ func completeVerify(w http.ResponseWriter, r *http.Request, svc AuthService, cfg
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("<!doctype html><html><body><p>You're signed in to FreqShow. You can close this tab.</p></body></html>"))
+	_, _ = w.Write(verifySuccessPage)
 }
+
+var verifySuccessPage = []byte(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Signed In — FreqShow</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #0f172a;
+      color: #f5f1e0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(251, 113, 133, 0.12), transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(45, 212, 191, 0.1), transparent 50%);
+    }
+    .card {
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 1.5rem;
+      padding: 2.5rem 2rem;
+      max-width: 26rem;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .icon-badge {
+      width: 3.5rem;
+      height: 3.5rem;
+      background: rgba(45, 212, 191, 0.15);
+      color: #2dd4bf;
+      border-radius: 1rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.25rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      color: #ffffff;
+      margin-bottom: 0.5rem;
+    }
+    p {
+      color: rgba(245, 241, 224, 0.7);
+      font-size: 0.925rem;
+      line-height: 1.5;
+      margin-bottom: 1.75rem;
+    }
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 0.875rem 1.5rem;
+      background: #2dd4bf;
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: none;
+      border-radius: 0.75rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background-color 0.15s ease;
+    }
+    .btn:hover {
+      background: #14b8a6;
+    }
+    .footer {
+      margin-top: 1.5rem;
+      font-size: 0.75rem;
+      color: rgba(245, 241, 224, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-badge">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 6L9 17l-5-5"/>
+      </svg>
+    </div>
+    <h1>You're signed in</h1>
+    <p>Your session has started. You can return to FreqShow or close this tab.</p>
+    <a href="/" class="btn">Open FreqShow</a>
+    <div class="footer">FreqShow &bull; Liner notes for music lovers</div>
+  </div>
+</body>
+</html>`)
 
 func setSessionCookie(w http.ResponseWriter, cfg cookieConfig, token string, expiresAt time.Time) {
 	// MaxAge alongside Expires: browsers prefer MaxAge when both are
@@ -241,4 +430,69 @@ func readSessionCookie(r *http.Request) (string, bool) {
 		return "", false
 	}
 	return cookie.Value, true
+}
+
+// authMeHandler implements GET /auth/me: inspects the session cookie and returns
+// the authenticated user record, or 401 if unauthenticated.
+func authMeHandler(svc AuthService) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !assertMethod(w, r, http.MethodGet) {
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		if svc == nil {
+			writeJSON(w, http.StatusUnauthorized, errorResponse{"not authenticated"})
+			return
+		}
+
+		token, ok := readSessionCookie(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, errorResponse{"not authenticated"})
+			return
+		}
+
+		user, err := svc.GetCurrentUser(r.Context(), token)
+		if err != nil || user == nil {
+			writeJSON(w, http.StatusUnauthorized, errorResponse{"not authenticated"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, user)
+	})
+}
+
+// authLogoutHandler implements POST /auth/logout: terminates the session in the database
+// and clears the session cookie.
+func authLogoutHandler(svc AuthService, cfg cookieConfig) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !assertMethod(w, r, http.MethodPost) {
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+
+		if svc != nil {
+			if token, ok := readSessionCookie(r); ok {
+				_ = svc.Logout(r.Context(), token)
+			}
+		}
+
+		clearSessionCookie(w, cfg)
+		writeJSON(w, http.StatusOK, map[string]string{
+			"status":  "ok",
+			"message": "signed out",
+		})
+	})
+}
+
+func clearSessionCookie(w http.ResponseWriter, cfg cookieConfig) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   cfg.secure,
+		SameSite: http.SameSiteLaxMode,
+	})
 }

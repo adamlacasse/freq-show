@@ -1,8 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CollectionService, CollectionItem } from '../../services/collection.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-collection',
@@ -12,21 +13,35 @@ import { CollectionService, CollectionItem } from '../../services/collection.ser
   styleUrls: []
 })
 export class CollectionComponent implements OnInit {
+  private readonly collectionService = inject(CollectionService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly authService = inject(AuthService);
+
   collection: CollectionItem[] = [];
   filteredCollection: CollectionItem[] = [];
   isLoading = true;
   error: string | null = null;
   searchTerm = '';
-  userId = 'adam'; // Hardcoded for MVP
+  userId = 'adam';
 
   editingItemId: number | null = null;
   editArtistName = '';
   editTitle = '';
   editYear: number | null = null;
 
-  constructor(private collectionService: CollectionService) {}
-
   ngOnInit(): void {
+    const routeUserId = this.route.snapshot.paramMap.get('userId');
+    if (routeUserId) {
+      if (routeUserId === 'me') {
+        const currentUser = this.authService.currentUser();
+        this.userId = currentUser ? currentUser.id : 'adam';
+      } else {
+        this.userId = routeUserId;
+      }
+    } else {
+      const currentUser = this.authService.currentUser();
+      this.userId = currentUser ? currentUser.id : 'adam';
+    }
     this.loadCollection();
   }
 

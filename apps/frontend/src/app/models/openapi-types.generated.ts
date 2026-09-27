@@ -55,6 +55,107 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a magic-link sign-in email
+         * @description Accepts an email address and, if login is configured (RESEND_API_KEY
+         *     set), emails a time-limited sign-in link. The response is the same
+         *     whether or not the address already has an account — accounts are
+         *     created lazily on first successful GET /auth/verify — so this
+         *     endpoint cannot be used to enumerate registered emails.
+         */
+        post: operations["requestLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Render a non-destructive sign-in confirmation page
+         * @description Renders an HTML page with a form that POSTs back to this same
+         *     endpoint. Deliberately does not consume the token itself: email
+         *     security scanners and prefetchers (e.g. Microsoft Defender
+         *     SafeLinks, Proofpoint) automatically fetch links found in incoming
+         *     mail before the recipient opens the message, and a GET that
+         *     consumed the one-time token would let that automated fetch burn it
+         *     before the real user ever clicks. Only the POST below (the form's
+         *     own submission, which scanners don't perform) actually completes
+         *     sign-in. The response is never cached (`Cache-Control: no-store`).
+         */
+        get: operations["verifyLoginConfirm"];
+        put?: never;
+        /**
+         * Consume a magic-link token and start a session
+         * @description Submitted by the confirmation page's own form (GET /auth/verify
+         *     above). Consumes the one-time token, delivered as an HttpOnly
+         *     `freqshow_session` cookie, then either redirects to the configured
+         *     frontend URL or serves a minimal confirmation page. The response
+         *     is never cached (`Cache-Control: no-store`).
+         */
+        post: operations["verifyLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the current authenticated user
+         * @description Returns the user record associated with the caller's session cookie.
+         *     Returns 401 if unauthenticated, missing, or expired.
+         */
+        get: operations["getAuthMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Terminate the current session and clear session cookie
+         * @description Deletes the session behind the caller's session cookie and clears the cookie.
+         */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/artists/{id}": {
         parameters: {
             query?: never;
@@ -113,6 +214,25 @@ export interface components {
             disambiguation?: string | null;
             aliases?: string[];
             lifeSpan: components["schemas"]["LifeSpan"];
+        };
+        AuthRequestBody: {
+            /** Format: email */
+            email: string;
+        };
+        AuthRequestResponse: {
+            status: string;
+            message?: string;
+        };
+        AuthLogoutResponse: {
+            status: string;
+            message?: string;
+        };
+        User: {
+            id: string;
+            /** Format: email */
+            email: string;
+            /** Format: date-time */
+            createdAt: string;
         };
         DiscoveryQuery: {
             query: string;
@@ -346,6 +466,214 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+        };
+    };
+    requestLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthRequestBody"];
+            };
+        };
+        responses: {
+            /** @description Sign-in email sent (or accepted for sending) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthRequestResponse"];
+                };
+            };
+            /** @description Invalid request body or malformed email address */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            405: components["responses"]["MethodNotAllowed"];
+            /** @description Too many login requests from this client */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login is not configured (no Resend API key) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    verifyLoginConfirm: {
+        parameters: {
+            query: {
+                /** @description The one-time token from the emailed sign-in link */
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Confirmation page served; token has not been consumed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Missing token query parameter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login is not configured (no Resend API key) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    verifyLogin: {
+        parameters: {
+            query?: {
+                /** @description The one-time token, when not supplied as a form field (see requestBody) — accepted either way for robustness. */
+                token?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/x-www-form-urlencoded": {
+                    token?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in; session cookie set; confirmation page served */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Signed in; session cookie set; redirected to the configured frontend URL */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing token (query parameter or form field) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Token is invalid, expired, or already used */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            405: components["responses"]["MethodNotAllowed"];
+            /** @description Login is not configured (no Resend API key) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getAuthMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authenticated user details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            /** @description Not authenticated or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            405: components["responses"]["MethodNotAllowed"];
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successfully signed out */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthLogoutResponse"];
+                };
+            };
+            405: components["responses"]["MethodNotAllowed"];
         };
     };
     getArtist: {
