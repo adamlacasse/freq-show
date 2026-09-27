@@ -60,17 +60,17 @@ describe('AppComponent', () => {
     expect(app).toBeTruthy();
   });
 
-  it(`should have the 'FreqShow' title`, () => {
+  it(`should have the 'FreqShow!' title`, () => {
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
-    expect(app.title).toEqual('FreqShow');
+    expect(app.title).toEqual('FreqShow!');
   });
 
   it('should render the brand in the header', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('header a')?.textContent).toContain('FreqShow');
+    expect(compiled.querySelector('header a')?.textContent).toContain('FreqShow!');
   });
 
   it('should clear search state when the home link is used', () => {

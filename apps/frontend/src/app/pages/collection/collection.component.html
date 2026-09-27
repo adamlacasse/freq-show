@@ -41,7 +41,7 @@
   </div>
 
   <!-- Loading State -->
-  <div *ngIf="isLoading" class="flex min-h-64 items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03]">
+  <div *ngIf="isLoading" class="card flex min-h-64 items-center justify-center">
     <div class="text-center">
       <div class="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-freq-teal border-t-transparent"></div>
       <p class="mt-4 text-sm text-freq-cream/70">Loading collection...</p>
@@ -126,7 +126,7 @@
         </div>
 
         <div class="mt-4 flex items-center justify-between border-t border-white/10 pt-4">
-          <span class="rounded-full bg-freq-teal/15 px-3 py-1 text-xs font-semibold text-freq-teal uppercase tracking-wide">{{ item.format }}</span>
+          <span class="badge-teal uppercase tracking-wide">{{ item.format }}</span>
           
           <!-- Clickable Year / Add Year Button -->
           <button 
@@ -149,11 +149,11 @@
       </div>
     </div>
     
-    <div *ngIf="filteredCollection.length === 0" class="flex min-h-64 items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-center text-freq-cream/60">
+    <div *ngIf="filteredCollection.length === 0" class="card flex min-h-64 items-center justify-center text-center text-freq-cream/60">
       <div *ngIf="collection.length === 0">
         <p class="text-lg font-medium text-white mb-2">Your collection is empty.</p>
         <p>Go to an album page and click "Add to Collection" to start tracking your records.</p>
-        <a routerLink="/" class="mt-4 inline-block rounded-full bg-freq-teal px-6 py-2 text-sm font-semibold text-freq-ink transition hover:bg-freq-teal/90">Search for records</a>
+        <a routerLink="/" class="btn-primary mt-4 inline-block px-6 py-2">Search for records</a>
       </div>
       <div *ngIf="collection.length > 0">
         <p>No records found matching "{{ searchTerm }}".</p>

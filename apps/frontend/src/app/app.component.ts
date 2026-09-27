@@ -15,7 +15,7 @@ import { AuthModalComponent } from './components/auth-modal/auth-modal.component
     styleUrl: './app.component.css'
 })
 export class AppComponent implements OnInit {
-  readonly title = 'FreqShow';
+  readonly title = 'FreqShow!';
 
   private readonly router = inject(Router);
   private readonly searchService = inject(SearchService);

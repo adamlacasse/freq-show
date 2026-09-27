@@ -9,7 +9,7 @@ import { SearchComponent } from '../../components/search/search.component';
 })
 export class HomeComponent {
   readonly hero = {
-    eyebrow: 'FreqShow',
+    eyebrow: 'FreqShow!',
     headline: 'Deep cuts, no ads.',
     description:
       'Search artists, read biographies from Wikipedia, browse sorted discographies from MusicBrainz, and open album pages with track listings and reviews.',

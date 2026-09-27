@@ -19,3 +19,87 @@
 		@apply bg-freq-rose/70 text-freq-cream;
 	}
 }
+
+/*
+ * FreqShow design system layer.
+ * Named surface/border/radius roles + the small set of recurring
+ * components (buttons, badges, cards, inputs). See docs/design-system.md.
+ * Rule of thumb: if you're about to hand-type a card/button/badge's
+ * utility string again, it probably belongs here instead.
+ */
+@layer components {
+  /* --- Surfaces: layered translucency over freq-ink, darkest to lightest --- */
+  .surface-sunken { @apply bg-white/[0.02]; }  /* nested rows inside a panel */
+  .surface-base   { @apply bg-white/[0.04]; }  /* default panel/card body, inputs */
+  .surface-raised { @apply bg-white/5; }       /* hero header cards, image placeholders */
+  .surface-hover  { @apply bg-white/10; }      /* hover/active state, neutral chips */
+  .surface-strong { @apply bg-white/20; }      /* secondary button fill */
+
+  /* --- Borders --- */
+  .border-subtle { @apply border border-white/5; }
+  .border-base   { @apply border border-white/10; }
+  .border-strong { @apply border border-white/20; }
+
+  /* --- Cards --- */
+  .card {
+    /* Standard content panel: biography, genres, discography, release details */
+    @apply rounded-3xl border-base surface-base p-6;
+  }
+  .card-hero {
+    /* Top-of-page hero card: artist/album header */
+    @apply rounded-3xl border-base surface-raised p-8 shadow-freq-card;
+  }
+  .card-inset {
+    /* Nested row inside a card: track list rows, review card */
+    @apply rounded-xl border border-white/5 surface-sunken p-3;
+  }
+  .card-interactive {
+    /* Clickable card: search results, discography tiles, related artists, collection grid */
+    @apply rounded-2xl border-base surface-raised p-4 text-left transition-all hover:border-strong hover:surface-hover;
+  }
+
+  /* --- Buttons --- */
+  .btn-pill {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    /* Main call to action: sign in, discover, add to collection */
+    @apply btn-pill bg-freq-teal text-freq-ink hover:bg-freq-teal/90;
+  }
+  .btn-secondary {
+    /* Secondary action next to a primary one */
+    @apply btn-pill border-base surface-hover text-white hover:surface-strong;
+  }
+  .btn-ghost {
+    /* Back buttons, "sign in" nav affordance, low-emphasis actions */
+    @apply btn-pill border-strong surface-raised text-freq-cream hover:border-strong hover:surface-hover;
+  }
+  .btn-nav {
+    /* Header nav links */
+    @apply rounded-full border-base px-3 py-1 text-sm font-medium text-freq-cream transition hover:border-strong hover:surface-hover;
+  }
+  .btn-danger-ghost {
+    /* Destructive/retry affordance on an error surface */
+    @apply btn-pill border border-freq-rose/30 bg-freq-rose/20 text-freq-rose hover:bg-freq-rose/30;
+  }
+
+  /* --- Badges / pills --- */
+  .badge {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold;
+  }
+  .badge-teal    { @apply badge bg-freq-teal/20 text-freq-teal; }
+  .badge-rose    { @apply badge bg-freq-rose/20 text-freq-rose; }
+  .badge-amber   { @apply badge bg-freq-amber/20 text-freq-amber; }
+  .badge-neutral { @apply badge surface-hover text-freq-cream; }
+
+  /* --- Chips --- */
+  .chip-muted {
+    /* Small muted tag: aliases, secondary-type overrides */
+    @apply rounded-full bg-freq-cream/10 px-2 py-1 text-xs text-freq-cream/70;
+  }
+
+  /* --- Inputs --- */
+  .input-field {
+    @apply w-full rounded-2xl border-base surface-base px-4 py-3 text-sm text-white outline-none transition placeholder:text-freq-cream/40 focus:border-freq-teal/70 focus:ring-2 focus:ring-freq-teal/50;
+  }
+}

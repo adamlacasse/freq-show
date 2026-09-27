@@ -5,7 +5,7 @@
         <p class="text-xs uppercase tracking-[0.3em] text-freq-teal/80">Discovery</p>
         <h1 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl">Find the next record.</h1>
         <p class="mt-4 text-base leading-relaxed text-freq-cream/75">
-          Describe what you want to hear — a mood, a reference, a texture. FreqShow will pick five records that fit.
+          Describe what you want to hear — a mood, a reference, a texture. FreqShow! will pick five records that fit.
         </p>
       </div>
       <a routerLink="/" class="w-fit rounded-full border border-white/15 px-4 py-2 text-sm font-medium text-freq-cream transition hover:border-white/35 hover:bg-white/10">
@@ -16,7 +16,7 @@
 </section>
 
 <section class="mx-auto grid max-w-6xl gap-8 px-6 py-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-  <form (ngSubmit)="submit()" class="space-y-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-freq-card">
+  <form (ngSubmit)="submit()" class="space-y-6 card shadow-freq-card">
     <div>
       <label for="query" class="text-sm font-semibold text-white">Listening request</label>
       <textarea
@@ -57,7 +57,7 @@
     <button
       type="submit"
       [disabled]="isLoading || !query.trim()"
-      class="inline-flex min-h-11 items-center justify-center rounded-full bg-freq-teal px-6 py-3 text-sm font-semibold text-freq-ink transition hover:bg-freq-teal/90 disabled:cursor-not-allowed disabled:opacity-50"
+      class="btn-primary px-6 py-3 min-h-11"
     >
       @if (isLoading) {
         Searching...
@@ -84,7 +84,7 @@
 
   <div class="min-h-[28rem]">
     @if (isLoading) {
-      <div class="flex h-full min-h-80 items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03]">
+      <div class="card flex h-full min-h-80 items-center justify-center">
         <div class="text-center">
           <div class="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-freq-teal border-t-transparent"></div>
           <p class="mt-4 text-sm text-freq-cream/70">Reading the shelves...</p>
@@ -94,7 +94,7 @@
       <div class="space-y-6">
         <div class="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
           <div class="flex flex-wrap gap-2">
-            <span class="rounded-full bg-freq-teal/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-freq-teal">
+            <span class="badge-teal uppercase tracking-wide">
               {{ result.interpreted.discoveryAppetite }} appetite
             </span>
             @for (quality of result.interpreted.sonicQualities; track quality) {
@@ -129,13 +129,13 @@
             }
           </div>
         } @else {
-          <div class="rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-sm text-freq-cream/70">
+          <div class="card text-sm text-freq-cream/70">
             No records matched what you asked for. Try loosening one of the constraints.
           </div>
         }
       </div>
     } @else {
-      <div class="flex h-full min-h-80 items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-freq-cream/60">
+      <div class="card flex h-full min-h-80 items-center justify-center text-center text-sm text-freq-cream/60">
         Results will appear here.
       </div>
     }

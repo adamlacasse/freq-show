@@ -9,23 +9,19 @@
 <!-- Error State -->
 <div *ngIf="error && !isLoading" class="flex min-h-screen items-center justify-center">
   <div class="text-center">
-    <div class="text-freq-rose">
-      <svg class="mx-auto h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-      </svg>
-    </div>
+    <img src="assets/clown-badge.png" alt="" class="mx-auto h-16 w-16" />
     <h2 class="mt-4 text-2xl font-semibold text-white">Unable to load album information</h2>
     <p class="mt-2 text-freq-cream/70">{{ error }}</p>
     <div class="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
     <button 
       (click)="retry()"
-      class="rounded-full bg-freq-teal px-6 py-2 font-medium text-freq-ink transition hover:bg-freq-teal/90"
+      class="btn-primary px-6 py-2 font-medium"
     >
       Try again
     </button>
     <button 
       (click)="goBack()"
-      class="rounded-full border border-white/20 bg-white/5 px-6 py-2 font-medium text-freq-cream transition hover:border-white/40 hover:bg-white/10"
+      class="btn-ghost px-6 font-medium"
     >
       ← {{ backLabel }}
     </button>
@@ -38,7 +34,7 @@
   <!-- Back Button -->
   <button 
     (click)="goBack()"
-    class="mb-6 flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-4 py-2 text-freq-cream/80 transition hover:border-white/40 hover:bg-white/10"
+    class="btn-ghost mb-6 text-freq-cream/80"
   >
     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
@@ -47,7 +43,7 @@
   </button>
 
   <!-- Album Header -->
-  <div class="mb-8 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-freq-card">
+  <div class="card-hero mb-8">
     <div class="flex flex-col gap-6 md:flex-row md:items-start">
       <!-- Album Cover Placeholder -->
       <div class="flex-shrink-0">
@@ -101,7 +97,7 @@
           <div class="rounded-full bg-freq-teal/20 px-3 py-1 text-freq-teal">
             {{ getReleaseYear() }}
           </div>
-          <div *ngIf="album.primaryType" class="rounded-full bg-freq-rose/20 px-3 py-1 text-freq-rose">
+          <div *ngIf="album.primaryType" class="rounded-full surface-strong px-3 py-1 text-freq-cream">
             {{ album.primaryType }}
           </div>
           <div *ngIf="album.genre && album.genre.trim()" class="rounded-full bg-freq-amber/20 px-3 py-1 text-freq-amber">
@@ -115,7 +111,7 @@
           <div class="flex flex-wrap gap-2">
             <span
               *ngFor="let type of album.secondaryTypes"
-              class="rounded-full bg-freq-cream/10 px-2 py-1 text-xs text-freq-cream/70"
+              class="chip-muted"
             >
               {{ type }}
             </span>
@@ -134,13 +130,13 @@
   <!-- Content Grid -->
   <div class="grid gap-8 lg:grid-cols-2">
     <!-- Tracklist Section -->
-    <div class="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+    <div class="card">
       <h2 class="mb-4 text-xl font-semibold text-white">Tracklist</h2>
       <div *ngIf="album.tracks && album.tracks.length > 0; else noTracks">
         <div class="space-y-3">
           <div
             *ngFor="let track of album.tracks; trackBy: trackByTrackNumber"
-            class="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] p-3"
+            class="card-inset flex items-center justify-between"
           >
             <div class="flex items-center gap-3">
               <div class="flex h-8 w-8 items-center justify-center rounded-full bg-freq-teal/20 text-xs font-medium text-freq-teal">
@@ -158,11 +154,11 @@
     </div>
 
     <!-- Reviews Section -->
-    <div class="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+    <div class="card">
       <h2 class="mb-4 text-xl font-semibold text-white">Reviews</h2>
       <div *ngIf="album.review && album.review.text && album.review.text.trim(); else noReviews">
         <div class="space-y-4">
-          <div class="rounded-xl border border-white/5 bg-white/[0.02] p-4">
+          <div class="card-inset p-4">
             <div class="mb-2 flex items-center justify-between">
               <div class="text-sm font-medium text-freq-cream">{{ album.review.source }}</div>
               <div *ngIf="album.review.rating > 0" class="flex items-center gap-1">
@@ -190,7 +186,7 @@
   </div>
 
   <!-- Release Details -->
-  <div class="mt-8 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+  <div class="card mt-8">
     <h2 class="mb-4 text-xl font-semibold text-white">Release details</h2>
     <div class="grid gap-4 sm:grid-cols-2">
       <div *ngIf="album.firstReleaseDate">

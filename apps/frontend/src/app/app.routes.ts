@@ -4,6 +4,7 @@ import { ArtistDetailComponent } from './pages/artist-detail/artist-detail.compo
 import { AlbumDetailComponent } from './pages/album-detail/album-detail.component';
 import { DiscoverComponent } from './pages/discover/discover.component';
 import { CollectionComponent } from './pages/collection/collection.component';
+import { NotFoundComponent } from './pages/not-found/not-found.component';
 
 export const routes: Routes = [
 	{ path: '', component: HomeComponent },
@@ -11,5 +12,5 @@ export const routes: Routes = [
 	{ path: 'collections/:userId', component: CollectionComponent },
 	{ path: 'artists/:id', component: ArtistDetailComponent },
 	{ path: 'albums/:id', component: AlbumDetailComponent },
-	{ path: '**', redirectTo: '' },
+	{ path: '**', component: NotFoundComponent },
 ];
