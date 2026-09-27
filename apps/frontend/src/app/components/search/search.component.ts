@@ -151,9 +151,6 @@ export class SearchComponent implements OnDestroy, OnInit {
 
   onArtistClick(artist: Artist): void {
     this.navigationContextService.saveSearchQuery(this.lastExecutedQuery);
-    this.navigationContextService.recordSearchResults(
-      !!(this.searchResults && this.searchResults.artists.length > 0)
-    );
     this.router.navigate(['/artists', artist.id]);
   }
 

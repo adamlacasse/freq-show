@@ -85,10 +85,9 @@ describe('AlbumDetailComponent', () => {
       albumService = jasmine.createSpyObj<AlbumService>('AlbumService', ['getAlbum']);
       const navContextService = jasmine.createSpyObj<NavigationContextService>(
         'NavigationContextService',
-        ['getAlbumProvenance', 'clearAlbumProvenance', 'getHadSearchResults', 'clearHadSearchResults']
+        ['getAlbumProvenance', 'clearAlbumProvenance', 'saveSearchQuery']
       );
       navContextService.getAlbumProvenance.and.returnValue(null);
-      navContextService.getHadSearchResults.and.returnValue(false);
       spyOn(console, 'error');
 
       albumService.getAlbum.and.returnValues(
@@ -100,6 +99,8 @@ describe('AlbumDetailComponent', () => {
         imports: [AlbumDetailComponent],
         providers: [
           provideRouter([]),
+          provideHttpClient(),
+          provideHttpClientTesting(),
           {
             provide: ActivatedRoute,
             useValue: { paramMap: routeParams$.asObservable() }
@@ -137,25 +138,23 @@ describe('AlbumDetailComponent', () => {
     let albumService: jasmine.SpyObj<AlbumService>;
     let navContextService: jasmine.SpyObj<NavigationContextService>;
 
-    async function setup(
-      provenance: AlbumProvenance | null,
-      hadSearchResults: boolean
-    ): Promise<void> {
+    async function setup(provenance: AlbumProvenance | null): Promise<void> {
       routeParams$ = new BehaviorSubject(convertToParamMap({ id: albumId }));
       albumService = jasmine.createSpyObj<AlbumService>('AlbumService', ['getAlbum']);
       navContextService = jasmine.createSpyObj<NavigationContextService>(
         'NavigationContextService',
-        ['getAlbumProvenance', 'clearAlbumProvenance', 'getHadSearchResults', 'clearHadSearchResults']
+        ['getAlbumProvenance', 'clearAlbumProvenance', 'saveSearchQuery']
       );
 
       albumService.getAlbum.and.returnValue(of(mockAlbum));
       navContextService.getAlbumProvenance.and.returnValue(provenance);
-      navContextService.getHadSearchResults.and.returnValue(hadSearchResults);
 
       await TestBed.configureTestingModule({
         imports: [AlbumDetailComponent],
         providers: [
           provideRouter([]),
+          provideHttpClient(),
+          provideHttpClientTesting(),
           {
             provide: ActivatedRoute,
             useValue: { paramMap: routeParams$.asObservable() }
@@ -171,7 +170,7 @@ describe('AlbumDetailComponent', () => {
 
     it('shows "Back to [Artist Name]" and navigates to artist page when provenance is artist', async () => {
       const provenance: AlbumProvenance = { source: 'artist', artistId: 'artist-1', artistName: 'Test Artist' };
-      await setup(provenance, false);
+      await setup(provenance);
 
       const backButton = (Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[])
         .find(b => b.textContent?.includes('Back to Test Artist'));
@@ -185,23 +184,25 @@ describe('AlbumDetailComponent', () => {
 
     it('shows "Back to Artist" when artist provenance is missing artist name', async () => {
       const provenance: AlbumProvenance = { source: 'artist', artistId: 'artist-1', artistName: '' };
-      await setup(provenance, false);
+      await setup(provenance);
 
       const backButton = (Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[])
         .find(b => b.textContent?.includes('Back to Artist'));
       expect(backButton).toBeTruthy();
     });
 
-    it('shows "Back to Search Results" when no provenance but had prior search results', async () => {
-      await setup(null, true);
+    it('shows "Back to Search Results" when search provenance had results', async () => {
+      const provenance: AlbumProvenance = { source: 'search', query: 'Radiohead', hadResults: true };
+      await setup(provenance);
 
       const backButton = (Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[])
         .find(b => b.textContent?.includes('Back to Search Results'));
       expect(backButton).toBeTruthy();
     });
 
-    it('shows "Back to Search" when no provenance and no prior search results', async () => {
-      await setup(null, false);
+    it('shows "Back to Search" when search provenance had no results', async () => {
+      const provenance: AlbumProvenance = { source: 'search', query: 'zzzznotfound', hadResults: false };
+      await setup(provenance);
 
       const backButton = (Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[])
         .find(b => b.textContent?.includes('Back to Search'));
@@ -209,13 +210,38 @@ describe('AlbumDetailComponent', () => {
       expect(fixture.nativeElement.textContent).not.toContain('Back to Search Results');
     });
 
+    it('navigates to the search screen and restores the query when provenance is search', async () => {
+      const provenance: AlbumProvenance = { source: 'search', query: 'Radiohead', hadResults: true };
+      await setup(provenance);
+
+      const router = TestBed.inject(Router);
+      spyOn(router, 'navigate');
+      fixture.componentInstance.goBack();
+
+      expect(navContextService.saveSearchQuery).toHaveBeenCalledWith('Radiohead');
+      expect(router.navigate).toHaveBeenCalledWith(['/']);
+    });
+
+    it('shows "Back to Search" when there is no provenance at all', async () => {
+      await setup(null);
+
+      const backButton = (Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[])
+        .find(b => b.textContent?.includes('Back to Search'));
+      expect(backButton).toBeTruthy();
+      expect(fixture.nativeElement.textContent).not.toContain('Back to Search Results');
+
+      const router = TestBed.inject(Router);
+      spyOn(router, 'navigate');
+      fixture.componentInstance.goBack();
+      expect(router.navigate).toHaveBeenCalledWith(['/']);
+    });
+
     it('retains artist back context across param changes when no fresh provenance is provided', async () => {
       const provenance: AlbumProvenance = { source: 'artist', artistId: 'artist-1', artistName: 'Test Artist' };
-      await setup(provenance, false);
+      await setup(provenance);
       expect(fixture.componentInstance.backLabel).toBe('Back to Test Artist');
 
       navContextService.getAlbumProvenance.and.returnValue(null);
-      navContextService.getHadSearchResults.and.returnValue(false);
 
       routeParams$.next(convertToParamMap({ id: 'album-2' }));
       fixture.detectChanges();
@@ -235,11 +261,10 @@ describe('AlbumDetailComponent', () => {
         artistName: 'New Artist'
       };
 
-      await setup(initialProvenance, false);
+      await setup(initialProvenance);
       expect(fixture.componentInstance.backLabel).toBe('Back to Test Artist');
 
       navContextService.getAlbumProvenance.and.returnValue(updatedProvenance);
-      navContextService.getHadSearchResults.and.returnValue(false);
 
       routeParams$.next(convertToParamMap({ id: 'album-2' }));
       fixture.detectChanges();
