@@ -4,9 +4,9 @@
 
 - **AI music discovery pipeline** — All 7 phases complete as of 2026-07-25. Natural-language listening requests resolved to ranked album recommendations with editorial reasoning, via Voyage embeddings + HF Inference LLM. Architecture in [`docs/adr/0001-discovery-pipeline-hosting.md`](docs/adr/0001-discovery-pipeline-hosting.md); implementation detail in [`docs/plans/discovery-pipeline-plan.md`](docs/plans/discovery-pipeline-plan.md). To run the real-key smoke test: `DISCOVERY_E2E=1 DISCOVERY_EMBEDDINGS_API_KEY=<key> DISCOVERY_LLM_API_KEY=<key> go test ./pkg/discovery/ -run TestDiscoveryE2E -v -timeout 120s`.
 
-- **Contextual back navigation from album pages** — Shipped 2026-09-27 (PR #4, follow-up fix in PR #9). Album pages opened from an artist page show a `Back to Artist` action; search-originated visits distinguish returning to prior results vs. an empty search screen. Navigation provenance is modeled as a typed variant on `NavigationContextService` rather than a separate ad-hoc flag.
+- **Contextual back navigation from album pages** — Shipped 2026-04-16 (PR #4), with navigation provenance refactored to a typed variant on 2026-09-27 (PR #9). Album pages opened from an artist page show a `Back to Artist` action. Navigation provenance is modeled as a typed variant on `NavigationContextService` rather than a separate ad-hoc flag, preparing the service for direct search return flows.
 
-- **Magic link authentication** — Shipped 2026-09-26 (PR #10). Passwordless email login via Resend, backed by new `users`/`login_tokens`/`sessions` SQLite tables. `POST /auth/request` issues a one-time token; `GET`/`POST /auth/verify` confirms and consumes it (split to avoid email-scanner prefetch burning the token) and sets a session cookie. `/discover` stays optionally authenticated: anonymous requests keep the per-IP limit, logged-in requests get a more generous per-user limit. Hardened post-review: CORS credential handling, atomic token consumption, per-email request cooldown, rate-limiter eviction sweep.
+- **Magic link authentication (Backend)** — Shipped 2026-09-26 (PR #10). Passwordless email login via Resend, backed by new `users`/`login_tokens`/`sessions` SQLite tables. `POST /auth/request` issues a one-time token; `GET`/`POST /auth/verify` confirms and consumes it (split to avoid email-scanner prefetch burning the token) and sets a session cookie. `/discover` stays optionally authenticated: anonymous requests keep the per-IP limit, logged-in requests get a more generous per-user limit. Hardened post-review: CORS credential handling, atomic token consumption, per-email request cooldown, rate-limiter eviction sweep.
 
 ## Downstream (ride on `album_embeddings` table)
 
@@ -17,11 +17,15 @@
 
 ## UI
 
+- **Direct Search → Album navigation & return flow** — Allow navigating directly from search results to album detail pages. This will produce `{ source: 'search' }` provenance on `NavigationContextService` and activate the typed return flows ("Back to Search Results" vs. "Back to Search").
+
 - **Expand frontend test coverage** — Coverage is better than the initial MVP, but service-level tests are still missing for `ArtistService` and `AlbumService`, and the UI specs can go deeper on loading states, template rendering, and service interactions.
 
 ## Auth / Personalization
 
-- **Personalization follow-ons** — Now that sessions exist (magic link auth), natural next steps: query history, saved picks, and preference memory tied to the logged-in user.
+- **Frontend authentication UI** — Build the client-side login and session experience in Angular: sign-in modal/page for requesting a magic link, session state service, auth status and sign-out controls in navigation, and regenerated OpenAPI types (`apps/frontend/src/app/models/openapi-types.generated.ts`).
+
+- **Personalization follow-ons** — Once users can authenticate through the UI, natural next steps: query history, saved picks, and preference memory tied to the logged-in user.
 
 ## Data / Integrations
 
