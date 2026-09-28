@@ -16,6 +16,7 @@
     "serve:ssr:frontend": "node dist/frontend/server/server.mjs"
   },
   "private": true,
+  "license": "MIT",
   "dependencies": {
     "@angular/animations": "^19.2.19",
     "@angular/common": "^19.2.19",

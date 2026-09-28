@@ -298,6 +298,10 @@ See `agent-context/development-log.md` for detailed technical roadmap.
 
 Questions or suggestions? Open an issue or drop a note! 🎶
 
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
 ---
 
 <br>
@@ -305,3 +309,4 @@ Questions or suggestions? Open an issue or drop a note! 🎶
 Brought to you by
 
 [![Lacasse Solutions](docs/img/lacasse-solutions.png)](https://adamlacasse.dev)
+
