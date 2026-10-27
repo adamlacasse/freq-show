@@ -60,7 +60,7 @@ See `agent-context/development-log.md` for a chronological narrative of how thes
 1. **Prerequisites**
 
 - Go 1.22+
-- Node.js 18+ and npm
+- Node.js 22.23.4+ (see `.nvmrc`) and npm
 - (Optional) SQLite if you want to inspect the generated database file
 
 2. **Clone and Install**
