@@ -67,10 +67,16 @@ describe('AlbumDetailComponent', () => {
       const firstRequest = httpMock.expectOne(`/api/albums/${albumId}`);
       firstRequest.flush(mockAlbum);
 
+      // Every successful album load also checks collection membership.
+      httpMock.expectOne('/api/collections/adam').flush([]);
+
       routeParams$.next(convertToParamMap({ id: albumId }));
       fixture.detectChanges();
 
+      // The album itself comes from the cache (no second album request)...
       httpMock.expectNone(`/api/albums/${albumId}`);
+      // ...but collection membership is re-checked on every navigation.
+      httpMock.expectOne('/api/collections/adam').flush([]);
       expect(fixture.nativeElement.textContent).toContain('Test Album');
     });
   });
